@@ -26,4 +26,9 @@ jobs:
         run: go vet ./...
 
       - name: Test
-        run: go test ./...
+        # internal/usecase's host-volume tests chown to a fixed uid/gid, which
+        # requires root (or CAP_CHOWN) - the same privilege this agent needs
+        # in production to manage arbitrary host directories. The default
+        # `runner` user doesn't have it, so run under sudo, preserving PATH so
+        # the setup-go toolchain is still found.
+        run: sudo -E env "PATH=$PATH" go test ./...

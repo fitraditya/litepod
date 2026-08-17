@@ -3,9 +3,12 @@ package docker
 import (
 	"context"
 	"fmt"
+	"io"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,6 +23,14 @@ import (
 // reachable, e.g. in a sandboxed CI runner without Docker.
 const testImage = "redis:7-alpine"
 
+// pullTestImageOnce ensures testImage is present locally exactly once per
+// test binary run, so these tests don't depend on it being pre-cached on
+// whatever machine/CI runner they execute on.
+var (
+	pullTestImageOnce sync.Once
+	pullTestImageErr  error
+)
+
 func testRepo(t *testing.T) (*Repository, context.Context) {
 	t.Helper()
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
@@ -30,6 +41,23 @@ func testRepo(t *testing.T) (*Repository, context.Context) {
 	defer cancel()
 	if _, err := cli.Ping(ctx); err != nil {
 		t.Skipf("docker daemon not reachable: %v", err)
+	}
+
+	pullTestImageOnce.Do(func() {
+		pullCtx, pullCancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer pullCancel()
+		out, err := cli.ImagePull(pullCtx, testImage, image.PullOptions{})
+		if err != nil {
+			pullTestImageErr = fmt.Errorf("pull %s: %w", testImage, err)
+			return
+		}
+		defer out.Close()
+		if _, err := io.Copy(io.Discard, out); err != nil {
+			pullTestImageErr = fmt.Errorf("pull %s: %w", testImage, err)
+		}
+	})
+	if pullTestImageErr != nil {
+		t.Fatalf("%v", pullTestImageErr)
 	}
 
 	return NewRepository(cli, logger.NewSilent()), context.Background()
