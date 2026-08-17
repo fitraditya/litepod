@@ -1,36 +1,24 @@
 # Litepod
 
-Litepod is a per-node HTTP agent that manages Docker containers on a single
-host. It's the thing that runs *on* each node of a multi-node hosting platform — deploy
-requests come from an external control plane, and this agent executes them locally against the
-Docker daemon. It is not a standalone dashboard/orchestrator: no UI, no multi-host awareness, no
-RBAC — those concerns live in the control plane driving it.
+Litepod is a per-node HTTP agent that manages Docker containers on a single host. It's the thing that runs *on* each node of a multi-node hosting platform — deploy requests come from an external control plane, and this agent executes them locally against the Docker daemon. It is not a standalone dashboard/orchestrator: no UI, no multi-host awareness, no RBAC — those concerns live in the control plane driving it.
 
 ## Features
 
-- Container lifecycle: deploy, atomic update (stop-remove-start), start/stop/restart, pause/unpause,
-  kill, suspend/unsuspend, reset (wipe volume + restart), destroy
+- Container lifecycle: deploy, atomic update (stop-remove-start), start/stop/restart, pause/unpause, kill, suspend/unsuspend, reset (wipe volume + restart), destroy
 - Live inspection: list, stats (CPU/mem/net), real-time state + health, logs (tail snapshot), IP
-- Admission control: rejects deploys/updates that would exceed configured node memory/CPU capacity
-  or conflict on a host port, tracked in-memory across concurrent in-flight requests
+- Admission control: rejects deploys/updates that would exceed configured node memory/CPU capacity or conflict on a host port, tracked in-memory across concurrent in-flight requests
 - Volumes: create/delete/list, host-bind mounts scoped under a configurable base path
 - Networks: create/delete/list
-- Images: exists check, list, background pull (bounded timeout, stream-decoded so registry
-  failures are actually caught)
-- Deploy requests cover most of the Docker Engine container-create surface — resources, storage,
-  networking, lifecycle, and hardening options. See [Deploy request fields](#deploy-request-fields)
-  below.
-- Structured logging via [obrel/go-lib](https://github.com/obrel/go-lib) with optional Sentry
-  error reporting
-- Sensitive env vars (`DOCKER_HOST`, `AGENT_KEY`, `AGENT_BOX_API_KEY`) stripped from any
-  container env passed in a deploy request
+- Images: exists check, list, background pull (bounded timeout, stream-decoded so registry failures are actually caught)
+- Deploy requests cover most of the Docker Engine container-create surface — resources, storage, networking, lifecycle, and hardening options. See [Deploy request fields](#deploy-request-fields) below.
+- Structured logging via [obrel/go-lib](https://github.com/obrel/go-lib) with optional Sentry error reporting
+- Sensitive env vars (`DOCKER_HOST`, `AGENT_KEY`, `AGENT_BOX_API_KEY`) stripped from any container env passed in a deploy request
 - Swagger/OpenAPI docs generated from handler annotations
 
 ## Requirements
 
 - Go 1.25+
-- Docker daemon reachable via the standard Docker environment (`DOCKER_HOST` etc., or the default
-  local socket)
+- Docker daemon reachable via the standard Docker environment (`DOCKER_HOST` etc., or the default local socket)
 
 ## Configuration
 
@@ -81,8 +69,7 @@ Once running, the server listens on `:8080`. Swagger UI is available at `/swagge
 
 ## API overview
 
-All routes except `/health` and `/swagger/*` require an `X-API-KEY` header matching the
-configured `api_key`.
+All routes except `/health` and `/swagger/*` require an `X-API-KEY` header matching the configured `api_key`.
 
 | Method & Path                              | Purpose                                 |
 |---------------------------------------------|-------------------------------------------|
@@ -114,9 +101,7 @@ Full request/response schemas: `docs/swagger.json` / `docs/swagger.yaml`, or `/s
 
 ## Deploy request fields
 
-`POST /containers` and `PUT /containers/{name}` take a JSON body that maps onto the Docker
-Engine API's container-create fields. The body is decoded with unknown fields rejected (400), so
-this table is the complete, authoritative list — nothing beyond it is accepted.
+`POST /containers` and `PUT /containers/{name}` take a JSON body that maps onto the Docker Engine API's container-create fields. The body is decoded with unknown fields rejected (400), so this table is the complete, authoritative list — nothing beyond it is accepted.
 
 **Identity / image**
 
@@ -178,10 +163,7 @@ this table is the complete, authoritative list — nothing beyond it is accepted
 | `security_opt` | []string | e.g. `no-new-privileges`; entries that weaken the sandbox (`unconfined`, `no-new-privileges=false`) are rejected |
 | `sysctls` | map[string]string | namespaced kernel sysctls |
 
-**Not exposed, by design:** `cap_add` and `privileged` (capability escalation is a container-escape
-vector on a multi-tenant host — only dropping capabilities is allowed), device passthrough, and
-per-network static IPs/aliases (the host has a single public IP; containers are reached via port
-mapping).
+**Not exposed, by design:** `cap_add` and `privileged` (capability escalation is a container-escape vector on a multi-tenant host — only dropping capabilities is allowed), device passthrough, and per-network static IPs/aliases (the host has a single public IP; containers are reached via port mapping).
 
 ## Architecture
 
@@ -199,8 +181,7 @@ See `CLAUDE.md` for implementation details and gotchas (admission-control reserv
 
 ## Release
 
-Push a `vX.Y.Z` tag and GitHub Actions runs GoReleaser to build linux/amd64 and linux/arm64
-binaries and publish them as a GitHub Release:
+Push a `vX.Y.Z` tag and GitHub Actions runs GoReleaser to build linux/amd64 and linux/arm64 binaries and publish them as a GitHub Release:
 
 ```bash
 git tag v0.1.0
