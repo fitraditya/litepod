@@ -12,6 +12,11 @@
 #      systemctl enable --now litepod
 #   4. journalctl -u litepod -f   # tail logs
 #
+# SSL: set TLS_CERT_FILE/TLS_KEY_FILE below (via litepod.env) to serve HTTPS.
+# Listen port defaults to 8080 plain / 8443 with TLS — override with PORT or
+# config.yaml's `port`. scripts/generate-cert.sh makes a self-signed cert/key
+# for testing; use a real CA-issued cert for anything production-facing.
+#
 # Why root: prepareVolume() chowns host-bind volume directories to a fixed
 # uid/gid so non-root processes inside deployed containers can write to them
 # — that requires root or CAP_CHOWN regardless of who already owns the file.
@@ -38,9 +43,9 @@ WorkingDirectory=/etc/litepod
 ExecStart=/usr/local/bin/litepod
 
 # Optional: override config.yaml values via env vars (AGENT_BOX_API_KEY,
-# DEPLOY_PORT_RANGE, VOLUME_BASE, SENTRY_DSN, LOG_FORMAT, LOG_LEVEL,
-# TLS_CERT_FILE, TLS_KEY_FILE, ...). The leading "-" makes a missing file
-# non-fatal.
+# DEPLOY_PORT_RANGE, VOLUME_BASE, SENTRY_DSN, PORT, TLS_CERT_FILE,
+# TLS_KEY_FILE, LOG_FORMAT, LOG_LEVEL, ...). The leading "-" makes a missing
+# file non-fatal.
 EnvironmentFile=-/etc/litepod/litepod.env
 
 # main.go handles SIGINT/SIGTERM itself and drains in-flight requests with a

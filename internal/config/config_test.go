@@ -110,6 +110,7 @@ api_key: "from-file"
 		t.Setenv("DEPLOY_PORT_RANGE", "1000-2000")
 		t.Setenv("VOLUME_BASE", "/env/base/")
 		t.Setenv("SENTRY_DSN", "https://sentry.example/dsn")
+		t.Setenv("PORT", "9443")
 
 		cfg, err := Load(path)
 		require.NoError(t, err)
@@ -117,11 +118,43 @@ api_key: "from-file"
 		assert.Equal(t, PortRange{1000, 2000}, cfg.DeployPortRange)
 		assert.Equal(t, "/env/base/", cfg.VolumeBase)
 		assert.Equal(t, "https://sentry.example/dsn", cfg.SentryDSN)
+		assert.Equal(t, 9443, cfg.Port)
 	})
 
 	t.Run("invalid DEPLOY_PORT_RANGE env errors", func(t *testing.T) {
 		path := writeTempConfig(t, `node_id: "node-1"`)
 		t.Setenv("DEPLOY_PORT_RANGE", "not-a-range")
+		_, err := Load(path)
+		assert.Error(t, err)
+	})
+
+	t.Run("port defaults to zero (resolved by main, not config)", func(t *testing.T) {
+		path := writeTempConfig(t, `
+node_id: "node-1"
+api_key: "key1"
+`)
+		cfg, err := Load(path)
+		require.NoError(t, err)
+		assert.Equal(t, 0, cfg.Port)
+	})
+
+	t.Run("explicit port in yaml preserved", func(t *testing.T) {
+		path := writeTempConfig(t, `
+node_id: "node-1"
+api_key: "key1"
+port: 9090
+`)
+		cfg, err := Load(path)
+		require.NoError(t, err)
+		assert.Equal(t, 9090, cfg.Port)
+	})
+
+	t.Run("invalid PORT env errors", func(t *testing.T) {
+		path := writeTempConfig(t, `
+node_id: "node-1"
+api_key: "key1"
+`)
+		t.Setenv("PORT", "not-a-port")
 		_, err := Load(path)
 		assert.Error(t, err)
 	})

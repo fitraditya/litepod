@@ -41,6 +41,7 @@ sentry_dsn: ""   # optional; leave empty to disable Sentry error reporting
 | Deploy port range  | `deploy_port_range`    | `{min, max}`; restricts host ports a deployed container may bind to (unset = unrestricted) |
 | Volume base path   | `volume_base`          | Host directory root that host-bind volume paths are validated against (default `/home/deployer/data/`) |
 | Sentry DSN         | `sentry_dsn`           | Optional; enables Sentry error reporting when set        |
+| Port               | `port`                 | Optional. Listen port; if unset defaults to `8080` (plain) or `8443` (when `TLS_CERT_FILE`/`TLS_KEY_FILE` are set) |
 
 ### Environment variable overrides
 
@@ -50,6 +51,9 @@ sentry_dsn: ""   # optional; leave empty to disable Sentry error reporting
 | `DEPLOY_PORT_RANGE`    | `deploy_port_range` (format `"min-max"`)       |
 | `VOLUME_BASE`          | `volume_base`                                  |
 | `SENTRY_DSN`           | `sentry_dsn`                                   |
+| `PORT`                 | `port`                                         |
+| `TLS_CERT_FILE`        | Path to a TLS certificate — enables HTTPS when set together with `TLS_KEY_FILE` |
+| `TLS_KEY_FILE`         | Path to the matching TLS private key           |
 | `LOG_FORMAT`           | `json` for structured logs, otherwise text     |
 | `LOG_LEVEL`            | logrus level (`debug`, `info`, `warn`, ...)    |
 | `SENTRY_ENVIRONMENT`   | Sentry environment tag (default `production`)  |
@@ -65,11 +69,35 @@ make coverage  # tests + coverage.html report
 make swag      # regenerate docs/ (Swagger) after changing @-annotated handlers/routes
 ```
 
-Once running, the server listens on `:8080`. Swagger UI is available at `/swagger/index.html`.
+Once running, the server listens on `:8080` by default (plain HTTP). Swagger UI is available at `/swagger/index.html`.
+
+### Enabling SSL
+
+Set `TLS_CERT_FILE`/`TLS_KEY_FILE` to a cert/key pair and the server switches to HTTPS, defaulting to port `8443` instead of `8080` (set `port`/`PORT` explicitly to override either default). For a quick self-signed cert to test with:
+
+```bash
+scripts/generate-cert.sh                # writes scripts/certs/litepod.{crt,key}, gitignored
+TLS_CERT_FILE=scripts/certs/litepod.crt TLS_KEY_FILE=scripts/certs/litepod.key ./bin/litepod
+```
+
+A self-signed cert isn't trusted by any client's CA store — fine for local testing (`curl -k`), but use a cert from a real CA (Let's Encrypt, your org's PKI) for anything reachable by real clients.
 
 ### Running as a systemd service
 
-`scripts/litepod.service` runs the agent as a persistent daemon:
+`scripts/install.sh` builds the binary, installs it, writes a config with a freshly generated `api_key`, and installs `scripts/litepod.service`:
+
+```bash
+sudo scripts/install.sh                          # plain HTTP, review config then enable manually
+sudo scripts/install.sh --ssl                     # also generates a self-signed cert, serves HTTPS on :8443
+sudo scripts/install.sh --ssl --enable            # ... and starts the service immediately
+sudo scripts/install.sh --node-id my-node --enable
+
+journalctl -u litepod -f                          # tail logs
+```
+
+The generated `api_key` is printed once at the end — store it. `--help` lists all flags. Runs as root — `prepareVolume()` chowns host-bind volume directories to a fixed uid/gid, which needs root or `CAP_CHOWN` regardless of who currently owns the path, and the agent also needs access to the Docker socket.
+
+Or do it by hand — the same steps `install.sh` automates:
 
 ```bash
 sudo cp bin/litepod /usr/local/bin/litepod
@@ -82,11 +110,9 @@ sudo chmod 600 /etc/litepod/config.yaml # it holds the API key
 sudo cp scripts/litepod.service /etc/systemd/system/litepod.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now litepod
-
-journalctl -u litepod -f                # tail logs
 ```
 
-Runs as root — `prepareVolume()` chowns host-bind volume directories to a fixed uid/gid, which needs root or `CAP_CHOWN` regardless of who currently owns the path, and the agent also needs access to the Docker socket. See the comments in `scripts/litepod.service` for config file location, optional env-var overrides via `/etc/litepod/litepod.env`, and the graceful-shutdown timeout.
+See the comments in `scripts/litepod.service` for config file location, optional env-var overrides via `/etc/litepod/litepod.env`, and the graceful-shutdown timeout.
 
 ## API overview
 

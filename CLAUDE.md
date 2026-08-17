@@ -21,7 +21,7 @@ Run a single test: `go test ./internal/usecase/... -run TestName -v`
 
 There is no lint target in the Makefile; CI does not run one either.
 
-Requires Go 1.25+ and a reachable Docker daemon (standard `DOCKER_HOST` env or local socket). Server listens on `:8080`; Swagger UI at `/swagger/index.html`.
+Requires Go 1.25+ and a reachable Docker daemon (standard `DOCKER_HOST` env or local socket). Server listens on `:8080` by default (`:8443` if `TLS_CERT_FILE`/`TLS_KEY_FILE` are set — see below), overridable via `port` in config.yaml or the `PORT` env var. Swagger UI at `/swagger/index.html`.
 
 ## Architecture
 
@@ -41,9 +41,12 @@ internal/config      YAML config loading + env var overrides
 - Auth: a single static API key (`X-API-KEY` header, checked in `internal/handler/middleware/auth.go`) gates `/containers`, `/images`, `/networks`, `/volumes`. `/health` and `/swagger/*` are unauthenticated.
 - `DeployRequest`/`DeploySpec` in `internal/domain/model.go` hold every field the deploy/update use case accepts. Full field-by-field reference below ("Deploy payload fields").
 - `sensitiveEnvKeys` in `internal/usecase/container.go` (`DOCKER_HOST`, `AGENT_KEY`, `AGENT_BOX_API_KEY`) are stripped from any env vars a deploy request tries to pass into a container.
-- Config (`internal/config/config.go`) loads `config.yaml`, then lets env vars override specific fields: `AGENT_BOX_API_KEY`, `DEPLOY_PORT_RANGE` (`"min-max"` format), `VOLUME_BASE`, `SENTRY_DSN`.
+- Config (`internal/config/config.go`) loads `config.yaml`, then lets env vars override specific fields: `AGENT_BOX_API_KEY`, `DEPLOY_PORT_RANGE` (`"min-max"` format), `VOLUME_BASE`, `SENTRY_DSN`, `PORT`.
 - Logging (`pkg/logger/logger.go`) wraps `github.com/obrel/go-lib/pkg/log` (itself a logrus wrapper) — don't reimplement logging here, extend the shared package instead. Level/format via `LOG_LEVEL`/`LOG_FORMAT` env vars; if `SentryDSN` is configured, errors also report to Sentry (`SENTRY_ENVIRONMENT`, default `production`; `APP_VERSION`, default `dev`).
 - `main.go` pings the Docker daemon at startup (`client.Ping`, 10s timeout) and `Fatal`s if it's unreachable — a dead/misconfigured daemon fails at boot, not on the first deploy request. The HTTP server also does a graceful shutdown on SIGINT/SIGTERM (`signal.NotifyContext` + `srv.Shutdown` with a 15s drain timeout via `http.Server`, not the bare `http.ListenAndServe` helpers) — in-flight requests get to finish before the process exits.
+- Listen port resolution (`main.go`): `cfg.Port` (from `port` in config.yaml or `PORT` env, validated in `config.Load`) wins if set; otherwise it's `8080` plain or `8443` when `TLS_CERT_FILE`+`TLS_KEY_FILE` are both set (`useTLS` in `main.go`). TLS is only enabled when *both* env vars are set — one without the other silently falls back to plain HTTP, no error.
+- `scripts/generate-cert.sh [days] [cn] [output-dir]` generates a self-signed cert/key (default output `scripts/certs/`, gitignored — never commit a real private key); accepts an output-dir override and a `FORCE=1` env var to skip its overwrite prompt, both used by `scripts/install.sh`.
+- `scripts/install.sh [--ssl] [--enable] [--node-id NAME]` is the one-shot installer: checks it's running as root, `go build`s a stripped binary to `/usr/local/bin/litepod`, writes `/etc/litepod/config.yaml` from `config.yaml.example` with a freshly generated `api_key` (printed once, not stored anywhere else), optionally runs `generate-cert.sh` into `/etc/litepod/certs/` and wires `TLS_CERT_FILE`/`TLS_KEY_FILE` into `/etc/litepod/litepod.env`, and installs `scripts/litepod.service`. Doesn't `systemctl enable` unless `--enable` is passed, so config can be reviewed first.
 
 ## Deploy payload fields
 

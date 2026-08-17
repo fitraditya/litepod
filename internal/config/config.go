@@ -36,6 +36,11 @@ type Config struct {
 	DeployPortRange PortRange `yaml:"deploy_port_range"`
 	VolumeBase      string    `yaml:"volume_base"`
 	SentryDSN       string    `yaml:"sentry_dsn"`
+	// Port the HTTP server listens on. Zero means "use the default for
+	// whether TLS is enabled" (see main.go: 8080 plain, 8443 with
+	// TLS_CERT_FILE/TLS_KEY_FILE set) — resolved at startup, not here, since
+	// that decision also depends on the TLS env vars.
+	Port int `yaml:"port"`
 }
 
 // parsePortRange parses a "min-max" string (e.g. "20000-30000") into a PortRange.
@@ -90,6 +95,13 @@ func Load(path string) (*Config, error) {
 	}
 	if v := os.Getenv("SENTRY_DSN"); v != "" {
 		cfg.SentryDSN = v
+	}
+	if v := os.Getenv("PORT"); v != "" {
+		port, err := strconv.Atoi(v)
+		if err != nil || port <= 0 || port > 65535 {
+			return nil, fmt.Errorf("PORT: invalid port %q", v)
+		}
+		cfg.Port = port
 	}
 
 	if cfg.APIKey == "" {

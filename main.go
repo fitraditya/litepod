@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -28,6 +29,14 @@ const dockerPingTimeout = 10 * time.Second
 // shutdownTimeout bounds how long the server waits for in-flight requests to
 // finish on SIGINT/SIGTERM before forcing the process to exit.
 const shutdownTimeout = 15 * time.Second
+
+// Default listen ports when Port isn't set in config.yaml/PORT env var:
+// the conventional plain-HTTP port, and the conventional HTTPS port when
+// TLS_CERT_FILE/TLS_KEY_FILE are configured.
+const (
+	defaultPlainPort = 8080
+	defaultTLSPort   = 8443
+)
 
 // @title           Litepod API
 // @version         1.0
@@ -66,8 +75,18 @@ func main() {
 	healthHandler := handler.NewHealthHandler(uc, log)
 	router := handler.NewRouter(cfg, containerHandler, healthHandler, log)
 
-	addr := ":8080"
 	certFile, keyFile := os.Getenv("TLS_CERT_FILE"), os.Getenv("TLS_KEY_FILE")
+	useTLS := certFile != "" && keyFile != ""
+
+	port := cfg.Port
+	if port == 0 {
+		if useTLS {
+			port = defaultTLSPort
+		} else {
+			port = defaultPlainPort
+		}
+	}
+	addr := fmt.Sprintf(":%d", port)
 	srv := &http.Server{Addr: addr, Handler: router}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -75,11 +94,11 @@ func main() {
 
 	serveErr := make(chan error, 1)
 	go func() {
-		log.WithFields(logger.Fields{"addr": addr, "tls": certFile != ""}).Info("Litepod running")
+		log.WithFields(logger.Fields{"addr": addr, "tls": useTLS}).Info("Litepod running")
 		// The API key travels in the X-API-KEY header on every request; without
 		// TLS it's plaintext on the wire, so native TLS is offered whenever a
 		// cert/key pair is configured rather than requiring a separate proxy.
-		if certFile != "" && keyFile != "" {
+		if useTLS {
 			serveErr <- srv.ListenAndServeTLS(certFile, keyFile)
 		} else {
 			serveErr <- srv.ListenAndServe()
