@@ -1,0 +1,1731 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "HTTP API for managing containerized services on a Litepod node.",
+        "title": "Litepod API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "basePath": "/",
+    "paths": {
+        "/containers": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns all containers on this node (running and stopped).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "containers"
+                ],
+                "summary": "List containers",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/handler.ContainerItem"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Checks node capacity, creates the volume directory, and starts a new container.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "containers"
+                ],
+                "summary": "Deploy a container",
+                "parameters": [
+                    {
+                        "description": "Container deploy request",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.DeployPayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handler.DeployResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/containers/{name}": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Performs an atomic stop-remove-start cycle with the new spec.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "containers"
+                ],
+                "summary": "Update a container",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Container name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Container update request",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.DeployPayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.UpdateResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Stops and removes the container and its volumes.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "containers"
+                ],
+                "summary": "Destroy a container",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Container name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/containers/{name}/ip": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns the first non-empty IP address assigned to the named container.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "containers"
+                ],
+                "summary": "Container IP address",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Container name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.IPResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/containers/{name}/kill": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Sends a signal to the container's main process immediately, with no grace period.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "containers"
+                ],
+                "summary": "Kill a container",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Container name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Signal to send (default SIGKILL)",
+                        "name": "signal",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ActionResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/containers/{name}/logs": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns recent stdout/stderr logs for a named container.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "containers"
+                ],
+                "summary": "Container logs",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Container name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Number of lines to return from the end of the logs (0 = all)",
+                        "name": "tail",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Include timestamps in each log line",
+                        "name": "timestamps",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.LogsResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/containers/{name}/pause": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Freezes all processes in the container (cgroup freezer) without terminating them.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "containers"
+                ],
+                "summary": "Pause a container",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Container name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ActionResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/containers/{name}/reset": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Wipes the container's volume directory and restarts the container.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "containers"
+                ],
+                "summary": "Factory reset a container",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Container name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ActionResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/containers/{name}/restart": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Gracefully restarts a running container.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "containers"
+                ],
+                "summary": "Restart a container",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Container name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ActionResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/containers/{name}/start": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Explicitly starts a stopped container.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "containers"
+                ],
+                "summary": "Start a container",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Container name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ActionResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/containers/{name}/state": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns the full real-time state and health of a named container.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "containers"
+                ],
+                "summary": "Container real-time state",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Container name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ContainerState"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/containers/{name}/stats": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns live CPU and memory metrics for a named container.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "containers"
+                ],
+                "summary": "Container stats",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Container name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.StatsResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/containers/{name}/stop": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Explicitly stops a running container.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "containers"
+                ],
+                "summary": "Stop a container",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Container name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ActionResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/containers/{name}/suspend": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Stops the container.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "containers"
+                ],
+                "summary": "Suspend a container",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Container name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ActionResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/containers/{name}/unpause": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Resumes a paused container's frozen processes.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "containers"
+                ],
+                "summary": "Unpause a container",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Container name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ActionResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/containers/{name}/unsuspend": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Starts the container.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "containers"
+                ],
+                "summary": "Unsuspend a container",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Container name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ActionResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "description": "Returns current node CPU and available memory. No authentication required.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Node health check",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.HealthResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/images": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Lists all container images cached locally on this node.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "images"
+                ],
+                "summary": "List images",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/handler.ImageItem"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "head": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Checks if a container image exists locally on the node.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "images"
+                ],
+                "summary": "Check image existence",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Image name",
+                        "name": "name",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/images/pull": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Initiates pulling an image from the container registry in the background.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "images"
+                ],
+                "summary": "Pull a container image",
+                "parameters": [
+                    {
+                        "description": "Pull image request",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.PullImagePayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/networks": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Lists all Docker networks on this node.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "networks"
+                ],
+                "summary": "List networks",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ResourceListResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Creates a new Docker network for a user.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "networks"
+                ],
+                "summary": "Create a network",
+                "parameters": [
+                    {
+                        "description": "Network creation request",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.NetworkPayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/networks/{name}": {
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Deletes an existing Docker network.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "networks"
+                ],
+                "summary": "Delete a network",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Network name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/volumes": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Lists all Docker volumes on this node.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "volumes"
+                ],
+                "summary": "List volumes",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ResourceListResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Creates a new Docker volume for a user.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "volumes"
+                ],
+                "summary": "Create a volume",
+                "parameters": [
+                    {
+                        "description": "Volume creation request",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.VolumePayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/volumes/{name}": {
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Deletes an existing Docker volume.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "volumes"
+                ],
+                "summary": "Delete a volume",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Volume name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "domain.ContainerState": {
+            "type": "object",
+            "properties": {
+                "dead": {
+                    "type": "boolean"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "exit_code": {
+                    "type": "integer"
+                },
+                "finished_at": {
+                    "type": "string"
+                },
+                "health": {
+                    "$ref": "#/definitions/domain.Health"
+                },
+                "oom_killed": {
+                    "type": "boolean"
+                },
+                "paused": {
+                    "type": "boolean"
+                },
+                "pid": {
+                    "type": "integer"
+                },
+                "restarting": {
+                    "type": "boolean"
+                },
+                "running": {
+                    "type": "boolean"
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "description": "e.g., running, exited, paused",
+                    "type": "string"
+                }
+            }
+        },
+        "domain.Health": {
+            "type": "object",
+            "properties": {
+                "failing_streak": {
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "starting, healthy, unhealthy",
+                    "type": "string"
+                }
+            }
+        },
+        "handler.ActionResponse": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "example": "restarted"
+                }
+            }
+        },
+        "handler.ContainerItem": {
+            "type": "object",
+            "properties": {
+                "ID": {
+                    "type": "string",
+                    "example": "a1b2c3d4e5f6"
+                },
+                "Image": {
+                    "type": "string",
+                    "example": "n8nio/n8n:latest"
+                },
+                "Names": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "['/n8n-alice']"
+                    ]
+                },
+                "State": {
+                    "type": "string",
+                    "example": "running"
+                },
+                "Status": {
+                    "type": "string",
+                    "example": "Up 2 hours"
+                }
+            }
+        },
+        "handler.DeployPayload": {
+            "type": "object",
+            "properties": {
+                "cap_drop": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "['NET_RAW']"
+                    ]
+                },
+                "command": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "cpu_limit": {
+                    "type": "number",
+                    "example": 0.5
+                },
+                "dns": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "['1.1.1.1']"
+                    ]
+                },
+                "dns_search": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "['example.com']"
+                    ]
+                },
+                "entrypoint": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "env": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "extra_hosts": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "['host.local:203.0.113.1']"
+                    ]
+                },
+                "healthcheck": {
+                    "$ref": "#/definitions/handler.Healthcheck"
+                },
+                "image": {
+                    "type": "string",
+                    "example": "n8nio/n8n:latest"
+                },
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "logging": {
+                    "$ref": "#/definitions/handler.Logging"
+                },
+                "memory_limit": {
+                    "type": "integer",
+                    "example": 805306368
+                },
+                "memory_reservation": {
+                    "type": "integer",
+                    "example": 536870912
+                },
+                "name": {
+                    "type": "string",
+                    "example": "n8n-alice"
+                },
+                "networks": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "pids_limit": {
+                    "type": "integer",
+                    "example": 256
+                },
+                "ports": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.PortMapping"
+                    }
+                },
+                "read_only": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "restart_policy": {
+                    "type": "string",
+                    "example": "unless-stopped"
+                },
+                "security_opt": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "['no-new-privileges']"
+                    ]
+                },
+                "shm_size": {
+                    "type": "integer",
+                    "example": 67108864
+                },
+                "stop_grace_period": {
+                    "type": "integer",
+                    "example": 30
+                },
+                "stop_signal": {
+                    "type": "string",
+                    "example": "SIGTERM"
+                },
+                "sysctls": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "tmpfs": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "ulimits": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.Ulimit"
+                    }
+                },
+                "user": {
+                    "type": "string",
+                    "example": "node"
+                },
+                "volumes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.VolumeBind"
+                    }
+                },
+                "working_dir": {
+                    "type": "string",
+                    "example": "/home/node"
+                }
+            }
+        },
+        "handler.DeployResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "example": "a1b2c3d4e5f6"
+                },
+                "node": {
+                    "type": "string",
+                    "example": "node-01"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "deployed"
+                }
+            }
+        },
+        "handler.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string",
+                    "example": "invalid input: image is required"
+                }
+            }
+        },
+        "handler.HealthResponse": {
+            "type": "object",
+            "properties": {
+                "cpu_actual": {
+                    "type": "number",
+                    "example": 23.5
+                },
+                "node_id": {
+                    "type": "string",
+                    "example": "node-01"
+                },
+                "ram_free": {
+                    "type": "integer",
+                    "example": 4096
+                },
+                "status": {
+                    "type": "string",
+                    "example": "online"
+                }
+            }
+        },
+        "handler.Healthcheck": {
+            "type": "object",
+            "properties": {
+                "interval_seconds": {
+                    "type": "integer",
+                    "example": 10
+                },
+                "retries": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "test": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "['CMD-SHELL'",
+                        " 'pg_isready -U postgres']"
+                    ]
+                },
+                "timeout_seconds": {
+                    "type": "integer",
+                    "example": 5
+                }
+            }
+        },
+        "handler.IPResponse": {
+            "type": "object",
+            "properties": {
+                "ip": {
+                    "type": "string",
+                    "example": "172.17.0.2"
+                }
+            }
+        },
+        "handler.ImageItem": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "example": "sha256:a1b2c3d4e5f6"
+                },
+                "repo_tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "['nginx:latest']"
+                    ]
+                },
+                "size_mb": {
+                    "type": "integer",
+                    "example": 142
+                }
+            }
+        },
+        "handler.Logging": {
+            "type": "object",
+            "properties": {
+                "driver": {
+                    "type": "string",
+                    "example": "json-file"
+                },
+                "options": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "handler.LogsResponse": {
+            "type": "object",
+            "properties": {
+                "logs": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.NetworkPayload": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "example": "my-net"
+                }
+            }
+        },
+        "handler.PortMapping": {
+            "type": "object",
+            "properties": {
+                "container_port": {
+                    "type": "integer",
+                    "example": 5432
+                },
+                "host_port": {
+                    "type": "integer",
+                    "example": 5432
+                },
+                "protocol": {
+                    "type": "string",
+                    "example": "tcp"
+                }
+            }
+        },
+        "handler.PullImagePayload": {
+            "type": "object",
+            "properties": {
+                "image": {
+                    "type": "string",
+                    "example": "nginx:latest"
+                }
+            }
+        },
+        "handler.ResourceListResponse": {
+            "type": "object",
+            "properties": {
+                "resources": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "['my-net'",
+                        " 'prod-db']"
+                    ]
+                }
+            }
+        },
+        "handler.StatsResponse": {
+            "type": "object",
+            "properties": {
+                "cpu_usage_percent": {
+                    "type": "number",
+                    "example": 12.5
+                },
+                "mem_limit_bytes": {
+                    "type": "integer",
+                    "example": 805306368
+                },
+                "mem_usage_bytes": {
+                    "type": "integer",
+                    "example": 134217728
+                },
+                "network_rx_bytes": {
+                    "type": "integer",
+                    "example": 10485760
+                },
+                "network_tx_bytes": {
+                    "type": "integer",
+                    "example": 5242880
+                }
+            }
+        },
+        "handler.Ulimit": {
+            "type": "object",
+            "properties": {
+                "hard": {
+                    "type": "integer",
+                    "example": 2048
+                },
+                "name": {
+                    "type": "string",
+                    "example": "nofile"
+                },
+                "soft": {
+                    "type": "integer",
+                    "example": 1024
+                }
+            }
+        },
+        "handler.UpdateResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "example": "a1b2c3d4e5f6"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "updated"
+                }
+            }
+        },
+        "handler.VolumeBind": {
+            "type": "object",
+            "properties": {
+                "bind_path": {
+                    "type": "string",
+                    "example": "/var/lib/postgresql/data"
+                },
+                "host_path": {
+                    "type": "string",
+                    "example": "alice/data"
+                },
+                "read_only": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "type": {
+                    "type": "string",
+                    "example": "docker"
+                },
+                "volume_name": {
+                    "type": "string",
+                    "example": "user1_pgdata"
+                }
+            }
+        },
+        "handler.VolumePayload": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "example": "my-vol"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "ApiKeyAuth": {
+            "description": "API key required for all /containers endpoints",
+            "type": "apiKey",
+            "name": "X-API-KEY",
+            "in": "header"
+        }
+    }
+}

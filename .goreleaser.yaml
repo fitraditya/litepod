@@ -1,0 +1,35 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: litepod
+    main: ./main.go
+    binary: litepod
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - id: litepod
+    ids:
+      - litepod
+    name_template: "litepod_{{ .Os }}_{{ .Arch }}"
+    formats:
+      - tar.gz
+    files:
+      - config.yaml.example
+
+checksum:
+  name_template: "checksums.txt"
+
+release:
+  github:
+    owner: fitraditya
+    name: litepod

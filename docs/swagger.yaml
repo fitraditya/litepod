@@ -1,0 +1,1127 @@
+basePath: /
+definitions:
+  domain.ContainerState:
+    properties:
+      dead:
+        type: boolean
+      error:
+        type: string
+      exit_code:
+        type: integer
+      finished_at:
+        type: string
+      health:
+        $ref: '#/definitions/domain.Health'
+      oom_killed:
+        type: boolean
+      paused:
+        type: boolean
+      pid:
+        type: integer
+      restarting:
+        type: boolean
+      running:
+        type: boolean
+      started_at:
+        type: string
+      status:
+        description: e.g., running, exited, paused
+        type: string
+    type: object
+  domain.Health:
+    properties:
+      failing_streak:
+        type: integer
+      status:
+        description: starting, healthy, unhealthy
+        type: string
+    type: object
+  handler.ActionResponse:
+    properties:
+      status:
+        example: restarted
+        type: string
+    type: object
+  handler.ContainerItem:
+    properties:
+      ID:
+        example: a1b2c3d4e5f6
+        type: string
+      Image:
+        example: n8nio/n8n:latest
+        type: string
+      Names:
+        example:
+        - '[''/n8n-alice'']'
+        items:
+          type: string
+        type: array
+      State:
+        example: running
+        type: string
+      Status:
+        example: Up 2 hours
+        type: string
+    type: object
+  handler.DeployPayload:
+    properties:
+      cap_drop:
+        example:
+        - '[''NET_RAW'']'
+        items:
+          type: string
+        type: array
+      command:
+        items:
+          type: string
+        type: array
+      cpu_limit:
+        example: 0.5
+        type: number
+      dns:
+        example:
+        - '[''1.1.1.1'']'
+        items:
+          type: string
+        type: array
+      dns_search:
+        example:
+        - '[''example.com'']'
+        items:
+          type: string
+        type: array
+      entrypoint:
+        items:
+          type: string
+        type: array
+      env:
+        additionalProperties:
+          type: string
+        type: object
+      extra_hosts:
+        example:
+        - '[''host.local:203.0.113.1'']'
+        items:
+          type: string
+        type: array
+      healthcheck:
+        $ref: '#/definitions/handler.Healthcheck'
+      image:
+        example: n8nio/n8n:latest
+        type: string
+      labels:
+        additionalProperties:
+          type: string
+        type: object
+      logging:
+        $ref: '#/definitions/handler.Logging'
+      memory_limit:
+        example: 805306368
+        type: integer
+      memory_reservation:
+        example: 536870912
+        type: integer
+      name:
+        example: n8n-alice
+        type: string
+      networks:
+        items:
+          type: string
+        type: array
+      pids_limit:
+        example: 256
+        type: integer
+      ports:
+        items:
+          $ref: '#/definitions/handler.PortMapping'
+        type: array
+      read_only:
+        example: false
+        type: boolean
+      restart_policy:
+        example: unless-stopped
+        type: string
+      security_opt:
+        example:
+        - '[''no-new-privileges'']'
+        items:
+          type: string
+        type: array
+      shm_size:
+        example: 67108864
+        type: integer
+      stop_grace_period:
+        example: 30
+        type: integer
+      stop_signal:
+        example: SIGTERM
+        type: string
+      sysctls:
+        additionalProperties:
+          type: string
+        type: object
+      tmpfs:
+        additionalProperties:
+          type: string
+        type: object
+      ulimits:
+        items:
+          $ref: '#/definitions/handler.Ulimit'
+        type: array
+      user:
+        example: node
+        type: string
+      volumes:
+        items:
+          $ref: '#/definitions/handler.VolumeBind'
+        type: array
+      working_dir:
+        example: /home/node
+        type: string
+    type: object
+  handler.DeployResponse:
+    properties:
+      id:
+        example: a1b2c3d4e5f6
+        type: string
+      node:
+        example: node-01
+        type: string
+      status:
+        example: deployed
+        type: string
+    type: object
+  handler.ErrorResponse:
+    properties:
+      error:
+        example: 'invalid input: image is required'
+        type: string
+    type: object
+  handler.HealthResponse:
+    properties:
+      cpu_actual:
+        example: 23.5
+        type: number
+      node_id:
+        example: node-01
+        type: string
+      ram_free:
+        example: 4096
+        type: integer
+      status:
+        example: online
+        type: string
+    type: object
+  handler.Healthcheck:
+    properties:
+      interval_seconds:
+        example: 10
+        type: integer
+      retries:
+        example: 5
+        type: integer
+      test:
+        example:
+        - '[''CMD-SHELL'''
+        - ' ''pg_isready -U postgres'']'
+        items:
+          type: string
+        type: array
+      timeout_seconds:
+        example: 5
+        type: integer
+    type: object
+  handler.IPResponse:
+    properties:
+      ip:
+        example: 172.17.0.2
+        type: string
+    type: object
+  handler.ImageItem:
+    properties:
+      id:
+        example: sha256:a1b2c3d4e5f6
+        type: string
+      repo_tags:
+        example:
+        - '[''nginx:latest'']'
+        items:
+          type: string
+        type: array
+      size_mb:
+        example: 142
+        type: integer
+    type: object
+  handler.Logging:
+    properties:
+      driver:
+        example: json-file
+        type: string
+      options:
+        additionalProperties:
+          type: string
+        type: object
+    type: object
+  handler.LogsResponse:
+    properties:
+      logs:
+        type: string
+    type: object
+  handler.NetworkPayload:
+    properties:
+      name:
+        example: my-net
+        type: string
+    type: object
+  handler.PortMapping:
+    properties:
+      container_port:
+        example: 5432
+        type: integer
+      host_port:
+        example: 5432
+        type: integer
+      protocol:
+        example: tcp
+        type: string
+    type: object
+  handler.PullImagePayload:
+    properties:
+      image:
+        example: nginx:latest
+        type: string
+    type: object
+  handler.ResourceListResponse:
+    properties:
+      resources:
+        example:
+        - '[''my-net'''
+        - ' ''prod-db'']'
+        items:
+          type: string
+        type: array
+    type: object
+  handler.StatsResponse:
+    properties:
+      cpu_usage_percent:
+        example: 12.5
+        type: number
+      mem_limit_bytes:
+        example: 805306368
+        type: integer
+      mem_usage_bytes:
+        example: 134217728
+        type: integer
+      network_rx_bytes:
+        example: 10485760
+        type: integer
+      network_tx_bytes:
+        example: 5242880
+        type: integer
+    type: object
+  handler.Ulimit:
+    properties:
+      hard:
+        example: 2048
+        type: integer
+      name:
+        example: nofile
+        type: string
+      soft:
+        example: 1024
+        type: integer
+    type: object
+  handler.UpdateResponse:
+    properties:
+      id:
+        example: a1b2c3d4e5f6
+        type: string
+      status:
+        example: updated
+        type: string
+    type: object
+  handler.VolumeBind:
+    properties:
+      bind_path:
+        example: /var/lib/postgresql/data
+        type: string
+      host_path:
+        example: alice/data
+        type: string
+      read_only:
+        example: false
+        type: boolean
+      type:
+        example: docker
+        type: string
+      volume_name:
+        example: user1_pgdata
+        type: string
+    type: object
+  handler.VolumePayload:
+    properties:
+      name:
+        example: my-vol
+        type: string
+    type: object
+info:
+  contact: {}
+  description: HTTP API for managing containerized services on a Litepod node.
+  title: Litepod API
+  version: "1.0"
+paths:
+  /containers:
+    get:
+      description: Returns all containers on this node (running and stopped).
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handler.ContainerItem'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: List containers
+      tags:
+      - containers
+    post:
+      consumes:
+      - application/json
+      description: Checks node capacity, creates the volume directory, and starts
+        a new container.
+      parameters:
+      - description: Container deploy request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.DeployPayload'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handler.DeployResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Deploy a container
+      tags:
+      - containers
+  /containers/{name}:
+    delete:
+      description: Stops and removes the container and its volumes.
+      parameters:
+      - description: Container name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Destroy a container
+      tags:
+      - containers
+    put:
+      consumes:
+      - application/json
+      description: Performs an atomic stop-remove-start cycle with the new spec.
+      parameters:
+      - description: Container name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Container update request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.DeployPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.UpdateResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Update a container
+      tags:
+      - containers
+  /containers/{name}/ip:
+    get:
+      description: Returns the first non-empty IP address assigned to the named container.
+      parameters:
+      - description: Container name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.IPResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Container IP address
+      tags:
+      - containers
+  /containers/{name}/kill:
+    post:
+      description: Sends a signal to the container's main process immediately, with
+        no grace period.
+      parameters:
+      - description: Container name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Signal to send (default SIGKILL)
+        in: query
+        name: signal
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ActionResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Kill a container
+      tags:
+      - containers
+  /containers/{name}/logs:
+    get:
+      description: Returns recent stdout/stderr logs for a named container.
+      parameters:
+      - description: Container name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: Number of lines to return from the end of the logs (0 = all)
+        in: query
+        name: tail
+        type: integer
+      - description: Include timestamps in each log line
+        in: query
+        name: timestamps
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.LogsResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Container logs
+      tags:
+      - containers
+  /containers/{name}/pause:
+    post:
+      description: Freezes all processes in the container (cgroup freezer) without
+        terminating them.
+      parameters:
+      - description: Container name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ActionResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Pause a container
+      tags:
+      - containers
+  /containers/{name}/reset:
+    post:
+      description: Wipes the container's volume directory and restarts the container.
+      parameters:
+      - description: Container name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ActionResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Factory reset a container
+      tags:
+      - containers
+  /containers/{name}/restart:
+    post:
+      description: Gracefully restarts a running container.
+      parameters:
+      - description: Container name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ActionResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Restart a container
+      tags:
+      - containers
+  /containers/{name}/start:
+    post:
+      description: Explicitly starts a stopped container.
+      parameters:
+      - description: Container name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ActionResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Start a container
+      tags:
+      - containers
+  /containers/{name}/state:
+    get:
+      description: Returns the full real-time state and health of a named container.
+      parameters:
+      - description: Container name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.ContainerState'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Container real-time state
+      tags:
+      - containers
+  /containers/{name}/stats:
+    get:
+      description: Returns live CPU and memory metrics for a named container.
+      parameters:
+      - description: Container name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.StatsResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Container stats
+      tags:
+      - containers
+  /containers/{name}/stop:
+    post:
+      description: Explicitly stops a running container.
+      parameters:
+      - description: Container name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ActionResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Stop a container
+      tags:
+      - containers
+  /containers/{name}/suspend:
+    post:
+      description: Stops the container.
+      parameters:
+      - description: Container name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ActionResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Suspend a container
+      tags:
+      - containers
+  /containers/{name}/unpause:
+    post:
+      description: Resumes a paused container's frozen processes.
+      parameters:
+      - description: Container name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ActionResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Unpause a container
+      tags:
+      - containers
+  /containers/{name}/unsuspend:
+    post:
+      description: Starts the container.
+      parameters:
+      - description: Container name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ActionResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Unsuspend a container
+      tags:
+      - containers
+  /health:
+    get:
+      description: Returns current node CPU and available memory. No authentication
+        required.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.HealthResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      summary: Node health check
+      tags:
+      - health
+  /images:
+    get:
+      description: Lists all container images cached locally on this node.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handler.ImageItem'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: List images
+      tags:
+      - images
+    head:
+      description: Checks if a container image exists locally on the node.
+      parameters:
+      - description: Image name
+        in: query
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Check image existence
+      tags:
+      - images
+  /images/pull:
+    post:
+      consumes:
+      - application/json
+      description: Initiates pulling an image from the container registry in the background.
+      parameters:
+      - description: Pull image request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.PullImagePayload'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Pull a container image
+      tags:
+      - images
+  /networks:
+    get:
+      description: Lists all Docker networks on this node.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ResourceListResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: List networks
+      tags:
+      - networks
+    post:
+      consumes:
+      - application/json
+      description: Creates a new Docker network for a user.
+      parameters:
+      - description: Network creation request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.NetworkPayload'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Create a network
+      tags:
+      - networks
+  /networks/{name}:
+    delete:
+      description: Deletes an existing Docker network.
+      parameters:
+      - description: Network name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete a network
+      tags:
+      - networks
+  /volumes:
+    get:
+      description: Lists all Docker volumes on this node.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.ResourceListResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: List volumes
+      tags:
+      - volumes
+    post:
+      consumes:
+      - application/json
+      description: Creates a new Docker volume for a user.
+      parameters:
+      - description: Volume creation request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.VolumePayload'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Create a volume
+      tags:
+      - volumes
+  /volumes/{name}:
+    delete:
+      description: Deletes an existing Docker volume.
+      parameters:
+      - description: Volume name
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete a volume
+      tags:
+      - volumes
+securityDefinitions:
+  ApiKeyAuth:
+    description: API key required for all /containers endpoints
+    in: header
+    name: X-API-KEY
+    type: apiKey
+swagger: "2.0"

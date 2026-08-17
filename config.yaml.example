@@ -1,0 +1,5 @@
+node_id: "node-jakarta-01"
+api_key: "CHANGE_ME_generate_a_long_random_secret"  # rotate before deploying; never reuse this placeholder
+max_memory_mb: 12288  # 12GB dari total 16GB (sisakan untuk OS)
+max_cpu_units: 5.0    # 5 Core dari total 6 Core
+sentry_dsn: ""        # optional; leave empty to disable Sentry error reporting
