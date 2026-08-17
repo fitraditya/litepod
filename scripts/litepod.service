@@ -1,0 +1,64 @@
+# systemd unit for Litepod (github.com/fitraditya/litepod).
+#
+# Install:
+#   1. Build/download the binary and put it at /usr/local/bin/litepod
+#      (matches the GoReleaser archive's binary name).
+#   2. mkdir -p /etc/litepod
+#      cp config.yaml.example /etc/litepod/config.yaml
+#      # edit /etc/litepod/config.yaml — set a real api_key, node_id, etc.
+#      chmod 600 /etc/litepod/config.yaml   # it holds the API key
+#   3. cp scripts/litepod.service /etc/systemd/system/litepod.service
+#      systemctl daemon-reload
+#      systemctl enable --now litepod
+#   4. journalctl -u litepod -f   # tail logs
+#
+# Why root: prepareVolume() chowns host-bind volume directories to a fixed
+# uid/gid so non-root processes inside deployed containers can write to them
+# — that requires root or CAP_CHOWN regardless of who already owns the file.
+# The agent also needs access to the Docker socket. Running as root is the
+# simplest correct setup; if you'd rather not, add the service user to the
+# `docker` group and grant CAP_CHOWN via AmbientCapabilities instead.
+
+[Unit]
+Description=Litepod agent
+Documentation=https://github.com/fitraditya/litepod
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+
+# main.go loads config from a relative "config.yaml" path, so this must be
+# the directory containing it.
+WorkingDirectory=/etc/litepod
+
+ExecStart=/usr/local/bin/litepod
+
+# Optional: override config.yaml values via env vars (AGENT_BOX_API_KEY,
+# DEPLOY_PORT_RANGE, VOLUME_BASE, SENTRY_DSN, LOG_FORMAT, LOG_LEVEL,
+# TLS_CERT_FILE, TLS_KEY_FILE, ...). The leading "-" makes a missing file
+# non-fatal.
+EnvironmentFile=-/etc/litepod/litepod.env
+
+# main.go handles SIGINT/SIGTERM itself and drains in-flight requests with a
+# 15s timeout before exiting — give systemd a bit of headroom past that
+# before it escalates to SIGKILL.
+KillSignal=SIGTERM
+TimeoutStopSec=20
+
+Restart=on-failure
+RestartSec=5
+
+LimitNOFILE=65536
+
+# Logs go to journald; `main.go` already writes structured (optionally JSON,
+# via LOG_FORMAT=json) log lines to stdout.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=litepod
+
+[Install]
+WantedBy=multi-user.target

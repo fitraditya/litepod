@@ -59,13 +59,34 @@ sentry_dsn: ""   # optional; leave empty to disable Sentry error reporting
 
 ```bash
 make run       # go run main.go — requires config.yaml
-make build     # compile to ./bin/agent
+make build     # compile to ./bin/litepod
 make test      # go test ./...
 make coverage  # tests + coverage.html report
 make swag      # regenerate docs/ (Swagger) after changing @-annotated handlers/routes
 ```
 
 Once running, the server listens on `:8080`. Swagger UI is available at `/swagger/index.html`.
+
+### Running as a systemd service
+
+`scripts/litepod.service` runs the agent as a persistent daemon:
+
+```bash
+sudo cp bin/litepod /usr/local/bin/litepod
+
+sudo mkdir -p /etc/litepod
+sudo cp config.yaml.example /etc/litepod/config.yaml
+sudo $EDITOR /etc/litepod/config.yaml   # set a real api_key, node_id, etc.
+sudo chmod 600 /etc/litepod/config.yaml # it holds the API key
+
+sudo cp scripts/litepod.service /etc/systemd/system/litepod.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now litepod
+
+journalctl -u litepod -f                # tail logs
+```
+
+Runs as root — `prepareVolume()` chowns host-bind volume directories to a fixed uid/gid, which needs root or `CAP_CHOWN` regardless of who currently owns the path, and the agent also needs access to the Docker socket. See the comments in `scripts/litepod.service` for config file location, optional env-var overrides via `/etc/litepod/litepod.env`, and the graceful-shutdown timeout.
 
 ## API overview
 
