@@ -30,6 +30,18 @@ const dockerPingTimeout = 10 * time.Second
 // finish on SIGINT/SIGTERM before forcing the process to exit.
 const shutdownTimeout = 15 * time.Second
 
+// HTTP server timeouts. Without these, net/http's zero-value defaults mean no
+// timeout at all — a slow or stalled client can hold a connection (and a
+// goroutine) open indefinitely (a "slowloris" DoS). ReadHeaderTimeout alone
+// guards the most common variant (trickling headers); the others bound a
+// request/response body transfer and idle keep-alive connections.
+const (
+	readHeaderTimeout = 10 * time.Second
+	readTimeout       = 30 * time.Second
+	writeTimeout      = 60 * time.Second // generous: covers /images/pull streaming and large log tails
+	idleTimeout       = 120 * time.Second
+)
+
 // Default listen ports when Port isn't set in config.yaml/PORT env var:
 // the conventional plain-HTTP port, and the conventional HTTPS port when
 // TLS_CERT_FILE/TLS_KEY_FILE are configured.
@@ -87,7 +99,14 @@ func main() {
 		}
 	}
 	addr := fmt.Sprintf(":%d", port)
-	srv := &http.Server{Addr: addr, Handler: router}
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           router,
+		ReadHeaderTimeout: readHeaderTimeout,
+		ReadTimeout:       readTimeout,
+		WriteTimeout:      writeTimeout,
+		IdleTimeout:       idleTimeout,
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()

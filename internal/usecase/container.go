@@ -75,7 +75,7 @@ func (uc *ContainerUseCase) release(name string) {
 
 // Deploy validates, checks capacity, creates the volume, and starts the container.
 func (uc *ContainerUseCase) Deploy(ctx context.Context, req domain.DeployRequest) (*domain.DeployResult, error) {
-	log := uc.log.WithFields(logger.Fields{"op": "deploy", "container": req.Name, "image": req.Image})
+	log := logger.FromContext(ctx, uc.log).WithFields(logger.Fields{"op": "deploy", "container": req.Name, "image": req.Image})
 
 	if err := validateRequest(req, uc.cfg.DeployPortRange, uc.cfg.VolumeBase); err != nil {
 		log.WithError(err).Warn("Invalid deploy request")
@@ -135,7 +135,7 @@ func (uc *ContainerUseCase) Deploy(ctx context.Context, req domain.DeployRequest
 
 // Update performs an atomic stop-remove-start cycle with the new spec.
 func (uc *ContainerUseCase) Update(ctx context.Context, name string, req domain.DeployRequest) (*domain.DeployResult, error) {
-	log := uc.log.WithFields(logger.Fields{"op": "update", "container": name})
+	log := logger.FromContext(ctx, uc.log).WithFields(logger.Fields{"op": "update", "container": name})
 
 	req.Name = name
 	if err := validateRequest(req, uc.cfg.DeployPortRange, uc.cfg.VolumeBase); err != nil {
@@ -189,7 +189,7 @@ func (uc *ContainerUseCase) Update(ctx context.Context, name string, req domain.
 
 // Destroy stops and removes a container, including its volumes.
 func (uc *ContainerUseCase) Destroy(ctx context.Context, name string) error {
-	log := uc.log.WithFields(logger.Fields{"op": "destroy", "container": name})
+	log := logger.FromContext(ctx, uc.log).WithFields(logger.Fields{"op": "destroy", "container": name})
 
 	t := stopTimeoutSecs
 	_ = uc.repo.Stop(ctx, name, t)
@@ -204,7 +204,7 @@ func (uc *ContainerUseCase) Destroy(ctx context.Context, name string) error {
 
 // Start explicitly starts a stopped container.
 func (uc *ContainerUseCase) Start(ctx context.Context, name string) error {
-	log := uc.log.WithFields(logger.Fields{"op": "start", "container": name})
+	log := logger.FromContext(ctx, uc.log).WithFields(logger.Fields{"op": "start", "container": name})
 	if err := uc.repo.Start(ctx, name); err != nil {
 		log.WithError(err).Error("Start failed")
 		return err
@@ -215,7 +215,7 @@ func (uc *ContainerUseCase) Start(ctx context.Context, name string) error {
 
 // Stop explicitly stops a running container.
 func (uc *ContainerUseCase) Stop(ctx context.Context, name string) error {
-	log := uc.log.WithFields(logger.Fields{"op": "stop", "container": name})
+	log := logger.FromContext(ctx, uc.log).WithFields(logger.Fields{"op": "stop", "container": name})
 	t := stopTimeoutSecs
 	if err := uc.repo.Stop(ctx, name, t); err != nil {
 		log.WithError(err).Error("Stop failed")
@@ -227,7 +227,7 @@ func (uc *ContainerUseCase) Stop(ctx context.Context, name string) error {
 
 // Restart gracefully restarts a running container.
 func (uc *ContainerUseCase) Restart(ctx context.Context, name string) error {
-	log := uc.log.WithFields(logger.Fields{"op": "restart", "container": name})
+	log := logger.FromContext(ctx, uc.log).WithFields(logger.Fields{"op": "restart", "container": name})
 	if err := uc.repo.Restart(ctx, name); err != nil {
 		log.WithError(err).Error("Restart failed")
 		return err
@@ -239,7 +239,7 @@ func (uc *ContainerUseCase) Restart(ctx context.Context, name string) error {
 // Pause freezes all processes in a running container (cgroup freezer) without
 // terminating them.
 func (uc *ContainerUseCase) Pause(ctx context.Context, name string) error {
-	log := uc.log.WithFields(logger.Fields{"op": "pause", "container": name})
+	log := logger.FromContext(ctx, uc.log).WithFields(logger.Fields{"op": "pause", "container": name})
 	if err := uc.repo.Pause(ctx, name); err != nil {
 		log.WithError(err).Error("Pause failed")
 		return err
@@ -250,7 +250,7 @@ func (uc *ContainerUseCase) Pause(ctx context.Context, name string) error {
 
 // Unpause resumes a paused container's frozen processes.
 func (uc *ContainerUseCase) Unpause(ctx context.Context, name string) error {
-	log := uc.log.WithFields(logger.Fields{"op": "unpause", "container": name})
+	log := logger.FromContext(ctx, uc.log).WithFields(logger.Fields{"op": "unpause", "container": name})
 	if err := uc.repo.Unpause(ctx, name); err != nil {
 		log.WithError(err).Error("Unpause failed")
 		return err
@@ -262,7 +262,7 @@ func (uc *ContainerUseCase) Unpause(ctx context.Context, name string) error {
 // Kill sends a signal to the container's main process immediately, with no
 // grace period (unlike Stop, which sends SIGTERM and waits before SIGKILL).
 func (uc *ContainerUseCase) Kill(ctx context.Context, name string, signal string) error {
-	log := uc.log.WithFields(logger.Fields{"op": "kill", "container": name, "signal": signal})
+	log := logger.FromContext(ctx, uc.log).WithFields(logger.Fields{"op": "kill", "container": name, "signal": signal})
 	if err := uc.repo.Kill(ctx, name, signal); err != nil {
 		log.WithError(err).Error("Kill failed")
 		return err
@@ -273,7 +273,7 @@ func (uc *ContainerUseCase) Kill(ctx context.Context, name string, signal string
 
 // Suspend stops the container.
 func (uc *ContainerUseCase) Suspend(ctx context.Context, name string) error {
-	log := uc.log.WithFields(logger.Fields{"op": "suspend", "container": name})
+	log := logger.FromContext(ctx, uc.log).WithFields(logger.Fields{"op": "suspend", "container": name})
 
 	t := stopTimeoutSecs
 	if err := uc.repo.Stop(ctx, name, t); err != nil {
@@ -287,7 +287,7 @@ func (uc *ContainerUseCase) Suspend(ctx context.Context, name string) error {
 
 // Unsuspend starts the container.
 func (uc *ContainerUseCase) Unsuspend(ctx context.Context, name string) error {
-	log := uc.log.WithFields(logger.Fields{"op": "unsuspend", "container": name})
+	log := logger.FromContext(ctx, uc.log).WithFields(logger.Fields{"op": "unsuspend", "container": name})
 
 	if err := uc.repo.Restart(ctx, name); err != nil {
 		log.WithError(err).Error("Start failed during unsuspend")
@@ -320,7 +320,7 @@ func (uc *ContainerUseCase) Logs(ctx context.Context, name string, tail int, tim
 
 // Reset wipes the container's volume directory then restarts it.
 func (uc *ContainerUseCase) Reset(ctx context.Context, name string) error {
-	log := uc.log.WithFields(logger.Fields{"op": "reset", "container": name})
+	log := logger.FromContext(ctx, uc.log).WithFields(logger.Fields{"op": "reset", "container": name})
 
 	volPath, err := uc.repo.VolumePath(ctx, name)
 	if err != nil {
@@ -426,12 +426,12 @@ func (uc *ContainerUseCase) Health(ctx context.Context) (*domain.NodeHealth, err
 // --- Network Lifecycle ---
 
 func (uc *ContainerUseCase) CreateNetwork(ctx context.Context, name string) error {
-	uc.log.WithFields(logger.Fields{"op": "create_network", "name": name}).Info("Creating network")
+	logger.FromContext(ctx, uc.log).WithFields(logger.Fields{"op": "create_network", "name": name}).Info("Creating network")
 	return uc.repo.CreateNetwork(ctx, name)
 }
 
 func (uc *ContainerUseCase) DeleteNetwork(ctx context.Context, name string) error {
-	uc.log.WithFields(logger.Fields{"op": "delete_network", "name": name}).Info("Deleting network")
+	logger.FromContext(ctx, uc.log).WithFields(logger.Fields{"op": "delete_network", "name": name}).Info("Deleting network")
 	return uc.repo.DeleteNetwork(ctx, name)
 }
 
@@ -442,12 +442,12 @@ func (uc *ContainerUseCase) ListNetworks(ctx context.Context) ([]string, error) 
 // --- Volume Lifecycle ---
 
 func (uc *ContainerUseCase) CreateVolume(ctx context.Context, name string) error {
-	uc.log.WithFields(logger.Fields{"op": "create_volume", "name": name}).Info("Creating volume")
+	logger.FromContext(ctx, uc.log).WithFields(logger.Fields{"op": "create_volume", "name": name}).Info("Creating volume")
 	return uc.repo.CreateVolume(ctx, name)
 }
 
 func (uc *ContainerUseCase) DeleteVolume(ctx context.Context, name string) error {
-	uc.log.WithFields(logger.Fields{"op": "delete_volume", "name": name}).Info("Deleting volume")
+	logger.FromContext(ctx, uc.log).WithFields(logger.Fields{"op": "delete_volume", "name": name}).Info("Deleting volume")
 	return uc.repo.DeleteVolume(ctx, name)
 }
 

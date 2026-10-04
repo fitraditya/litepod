@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"context"
 	"io"
 	"os"
 
@@ -14,6 +15,36 @@ type (
 	Logger = logrus.Logger
 	Fields = logrus.Fields
 )
+
+type ctxKey int
+
+const (
+	ctxKeyRequestID ctxKey = iota
+	ctxKeyRemoteIP
+)
+
+// WithRequestMeta attaches the HTTP request ID and caller IP to ctx, so
+// business-logic log lines (usecase layer) can be correlated back to the
+// request that triggered them — a minimal audit trail of who did what.
+func WithRequestMeta(ctx context.Context, remoteIP, requestID string) context.Context {
+	ctx = context.WithValue(ctx, ctxKeyRemoteIP, remoteIP)
+	ctx = context.WithValue(ctx, ctxKeyRequestID, requestID)
+	return ctx
+}
+
+// FromContext returns base enriched with request_id/remote_ip fields from
+// ctx, if WithRequestMeta set them (e.g. ctx came from a background job, not
+// an HTTP request). Always safe to call.
+func FromContext(ctx context.Context, base *Logger) *logrus.Entry {
+	fields := Fields{}
+	if v, ok := ctx.Value(ctxKeyRequestID).(string); ok && v != "" {
+		fields["request_id"] = v
+	}
+	if v, ok := ctx.Value(ctxKeyRemoteIP).(string); ok && v != "" {
+		fields["remote_ip"] = v
+	}
+	return base.WithFields(fields)
+}
 
 // NewSilent returns a standalone logger instance (not the shared singleton)
 // with output discarded — for use in tests.

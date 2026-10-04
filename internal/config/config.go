@@ -41,7 +41,30 @@ type Config struct {
 	// TLS_CERT_FILE/TLS_KEY_FILE set) — resolved at startup, not here, since
 	// that decision also depends on the TLS env vars.
 	Port int `yaml:"port"`
+	// SwaggerDisabled turns off the /swagger/* routes. They're
+	// unauthenticated by design (reachable without an API key), which also
+	// means they're API-surface disclosure to anyone who can reach the node.
+	// Defaults to enabled (zero value = false = enabled) for dev convenience;
+	// set true in production deployments that don't need it reachable.
+	SwaggerDisabled bool `yaml:"swagger_disabled"`
+	// RateLimitRPS/RateLimitBurst bound per-client-IP request rate (token
+	// bucket), so one caller can't exhaust node resources by hammering the
+	// API. Zero in config.yaml means "use the default" (see
+	// defaultRateLimitRPS/defaultRateLimitBurst) — there's no "unlimited"
+	// escape hatch; a negative rps isn't meaningful so there's nothing
+	// sensible to map it to.
+	RateLimitRPS   float64 `yaml:"rate_limit_rps"`
+	RateLimitBurst int     `yaml:"rate_limit_burst"`
 }
+
+// Defaults for RateLimitRPS/RateLimitBurst when unset in config.yaml: this is
+// a per-node agent fronted by a control plane, not a public API, so these are
+// generous rather than tight — they exist to stop runaway/compromised callers,
+// not to throttle normal orchestration traffic.
+const (
+	defaultRateLimitRPS   = 20.0
+	defaultRateLimitBurst = 40
+)
 
 // parsePortRange parses a "min-max" string (e.g. "20000-30000") into a PortRange.
 func parsePortRange(s string) (PortRange, error) {
@@ -95,6 +118,33 @@ func Load(path string) (*Config, error) {
 	}
 	if v := os.Getenv("SENTRY_DSN"); v != "" {
 		cfg.SentryDSN = v
+	}
+	if v := os.Getenv("SWAGGER_DISABLED"); v != "" {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			return nil, fmt.Errorf("SWAGGER_DISABLED: invalid bool %q", v)
+		}
+		cfg.SwaggerDisabled = b
+	}
+	if v := os.Getenv("RATE_LIMIT_RPS"); v != "" {
+		f, err := strconv.ParseFloat(v, 64)
+		if err != nil || f <= 0 {
+			return nil, fmt.Errorf("RATE_LIMIT_RPS: invalid value %q", v)
+		}
+		cfg.RateLimitRPS = f
+	}
+	if v := os.Getenv("RATE_LIMIT_BURST"); v != "" {
+		b, err := strconv.Atoi(v)
+		if err != nil || b <= 0 {
+			return nil, fmt.Errorf("RATE_LIMIT_BURST: invalid value %q", v)
+		}
+		cfg.RateLimitBurst = b
+	}
+	if cfg.RateLimitRPS <= 0 {
+		cfg.RateLimitRPS = defaultRateLimitRPS
+	}
+	if cfg.RateLimitBurst <= 0 {
+		cfg.RateLimitBurst = defaultRateLimitBurst
 	}
 	if v := os.Getenv("PORT"); v != "" {
 		port, err := strconv.Atoi(v)

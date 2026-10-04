@@ -23,6 +23,14 @@ There is no lint target in the Makefile; CI does not run one either.
 
 Requires Go 1.25+ and a reachable Docker daemon (standard `DOCKER_HOST` env or local socket). Server listens on `:8080` by default (`:8443` if `TLS_CERT_FILE`/`TLS_KEY_FILE` are set — see below), overridable via `port` in config.yaml or the `PORT` env var. Swagger UI at `/swagger/index.html`.
 
+## Config
+
+`config.yaml` (copy from `config.yaml.example`): `node_id`, `api_key` (required, startup fails if unset — checked via `X-API-KEY`), `max_memory_mb`/`max_cpu_units` (admission-control ceilings), `deploy_port_range` (`{min, max}`, unset = unrestricted), `volume_base` (host-bind root, default `/home/deployer/data/`), `sentry_dsn`, `port`, `swagger_disabled` (bool, default false — set true in prod to stop serving the unauthenticated `/swagger/*` API schema), `rate_limit_rps`/`rate_limit_burst` (per-client-IP token bucket in `internal/handler/middleware/ratelimit.go`; 0/unset defaults to 20 rps / burst 40 — a safety net against a runaway or compromised caller, not meant to throttle normal control-plane traffic). Env overrides: `AGENT_BOX_API_KEY`, `DEPLOY_PORT_RANGE` (`"min-max"`), `VOLUME_BASE`, `SENTRY_DSN`, `PORT`, `SWAGGER_DISABLED`, `RATE_LIMIT_RPS`, `RATE_LIMIT_BURST`, `TLS_CERT_FILE`/`TLS_KEY_FILE`, `LOG_FORMAT`, `LOG_LEVEL`, `SENTRY_ENVIRONMENT`, `APP_VERSION`.
+
+`http.Server` in `main.go` sets explicit `ReadHeaderTimeout`/`ReadTimeout`/`WriteTimeout`/`IdleTimeout` — net/http's zero-value defaults are "no timeout," which lets a slow/stalled client hold a connection open indefinitely.
+
+Usecase-layer logs (`internal/usecase/container.go`) are enriched with `request_id`/`remote_ip` via `logger.FromContext(ctx, uc.log)`, populated by `logger.WithRequestMeta` in the request-logging middleware (`internal/handler/middleware/logging.go`) — gives every mutating operation's log line a correlatable caller identity, a minimal audit trail given the single static API key doesn't otherwise distinguish callers.
+
 ## Architecture
 
 Standard ports-and-adapters layout. Dependency direction is inward only:

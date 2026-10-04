@@ -25,12 +25,15 @@ func NewRouter(
 	r.Use(chimiddleware.RealIP)
 	r.Use(chimiddleware.Recoverer)
 	r.Use(middleware.Logger(log))
+	r.Use(middleware.RateLimit(cfg.RateLimitRPS, cfg.RateLimitBurst))
 
 	// Public endpoints
 	r.Get("/health", health.Health)
-	r.Get("/swagger", http.RedirectHandler("/swagger/index.html", http.StatusMovedPermanently).ServeHTTP)
-	r.Get("/swagger/", http.RedirectHandler("/swagger/index.html", http.StatusMovedPermanently).ServeHTTP)
-	r.Get("/swagger/*", httpSwagger.WrapHandler)
+	if !cfg.SwaggerDisabled {
+		r.Get("/swagger", http.RedirectHandler("/swagger/index.html", http.StatusMovedPermanently).ServeHTTP)
+		r.Get("/swagger/", http.RedirectHandler("/swagger/index.html", http.StatusMovedPermanently).ServeHTTP)
+		r.Get("/swagger/*", httpSwagger.WrapHandler)
+	}
 
 	r.Route("/containers", func(r chi.Router) {
 		r.Use(middleware.Auth(cfg))

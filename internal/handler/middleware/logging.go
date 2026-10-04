@@ -17,6 +17,9 @@ func Logger(log *logger.Logger) func(http.Handler) http.Handler {
 			ww := chimiddleware.NewWrapResponseWriter(w, r.ProtoMajor)
 			start := time.Now()
 
+			ctx := logger.WithRequestMeta(r.Context(), r.RemoteAddr, chimiddleware.GetReqID(r.Context()))
+			r = r.WithContext(ctx)
+
 			next.ServeHTTP(ww, r)
 
 			status := ww.Status()

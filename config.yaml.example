@@ -3,3 +3,6 @@ api_key: "CHANGE_ME_generate_a_long_random_secret"  # rotate before deploying; n
 max_memory_mb: 12288  # 12GB dari total 16GB (sisakan untuk OS)
 max_cpu_units: 5.0    # 5 Core dari total 6 Core
 sentry_dsn: ""        # optional; leave empty to disable Sentry error reporting
+swagger_disabled: false  # set true in production to stop serving unauthenticated /swagger/* API docs
+rate_limit_rps: 0     # per-client-IP request rate; 0 = default (20 rps)
+rate_limit_burst: 0   # per-client-IP burst allowance; 0 = default (40)
