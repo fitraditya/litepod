@@ -36,7 +36,7 @@ func TestPullAuth(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.image, func(t *testing.T) {
-			auth, err := r.pullAuth(c.image)
+			auth, err := r.pullAuth(c.image, nil)
 			require.NoError(t, err)
 			require.NotEmpty(t, auth)
 			m := decode(auth)
@@ -46,17 +46,31 @@ func TestPullAuth(t *testing.T) {
 	}
 
 	t.Run("unconfigured host is anonymous", func(t *testing.T) {
-		auth, err := r.pullAuth("quay.io/org/app:1")
+		auth, err := r.pullAuth("quay.io/org/app:1", nil)
 		require.NoError(t, err)
 		assert.Empty(t, auth)
 	})
 	t.Run("no creds configured", func(t *testing.T) {
-		auth, err := (&Repository{}).pullAuth("ghcr.io/acme/app")
+		auth, err := (&Repository{}).pullAuth("ghcr.io/acme/app", nil)
 		require.NoError(t, err)
 		assert.Empty(t, auth)
 	})
 	t.Run("invalid reference", func(t *testing.T) {
-		_, err := r.pullAuth("Not A Ref")
+		_, err := r.pullAuth("Not A Ref", nil)
 		assert.ErrorIs(t, err, domain.ErrInvalidInput)
+	})
+
+	t.Run("override replaces configured credential", func(t *testing.T) {
+		auth, err := r.pullAuth("ghcr.io/acme/app:v1", &domain.RegistryAuth{Username: "ci", Password: "tok"})
+		require.NoError(t, err)
+		m := decode(auth)
+		assert.Equal(t, "ci", m["username"])
+		assert.Equal(t, "tok", m["password"])
+		assert.Equal(t, "ghcr.io", m["serveraddress"])
+	})
+	t.Run("override works with no node credentials", func(t *testing.T) {
+		auth, err := (&Repository{}).pullAuth("registry.example.com/x/y", &domain.RegistryAuth{Username: "u", Password: "p"})
+		require.NoError(t, err)
+		assert.Equal(t, "registry.example.com", decode(auth)["serveraddress"])
 	})
 }

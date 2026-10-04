@@ -36,7 +36,7 @@ type mockRepo struct {
 	VolumeMountpointFunc func(ctx context.Context, name string) (string, error)
 	ListVolumesFunc      func(ctx context.Context) ([]string, error)
 	ImageExistsFunc      func(ctx context.Context, image string) (bool, error)
-	PullImageFunc        func(ctx context.Context, image string) error
+	PullImageFunc        func(ctx context.Context, image string, auth *domain.RegistryAuth) error
 	ListImagesFunc       func(ctx context.Context) ([]domain.ImageSummary, error)
 }
 
@@ -194,9 +194,9 @@ func (m *mockRepo) ImageExists(ctx context.Context, image string) (bool, error) 
 	return false, nil
 }
 
-func (m *mockRepo) PullImage(ctx context.Context, image string) error {
+func (m *mockRepo) PullImage(ctx context.Context, image string, auth *domain.RegistryAuth) error {
 	if m.PullImageFunc != nil {
-		return m.PullImageFunc(ctx, image)
+		return m.PullImageFunc(ctx, image, auth)
 	}
 	return nil
 }

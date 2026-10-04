@@ -1,5 +1,7 @@
 package handler
 
+import "github.com/fitraditya/litepod/internal/domain"
+
 // DeployPayload is the request body for POST /containers and PUT /containers/{name}.
 type DeployPayload struct {
 	Image             string            `json:"image"               example:"n8nio/n8n:latest"`
@@ -151,11 +153,29 @@ type ResourceListResponse struct {
 
 type PullImagePayload struct {
 	Image string `json:"image" example:"nginx:latest"`
+	// RegistryAuth optionally overrides the node-configured credential for
+	// this pull only.
+	RegistryAuth *RegistryAuthPayload `json:"registry_auth,omitempty"`
+}
+
+// RegistryAuthPayload is a per-request registry credential (password or access token).
+type RegistryAuthPayload struct {
+	Username string `json:"username" example:"bot"`
+	Password string `json:"password" example:"ghp_xxx"`
+}
+
+func (p *RegistryAuthPayload) toDomain() *domain.RegistryAuth {
+	if p == nil {
+		return nil
+	}
+	return &domain.RegistryAuth{Username: p.Username, Password: p.Password}
 }
 
 // WebhookDeployPayload is the request body for POST /webhook/containers/{name}/deploy.
 type WebhookDeployPayload struct {
 	Image string `json:"image" example:"ghcr.io/acme/app:sha-abc123"`
+	// RegistryAuth optionally overrides the node-configured credential for the pull.
+	RegistryAuth *RegistryAuthPayload `json:"registry_auth,omitempty"`
 }
 
 // ImageItem mirrors domain.ImageSummary for swagger documentation.

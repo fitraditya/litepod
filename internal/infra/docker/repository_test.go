@@ -250,7 +250,7 @@ func TestRepository_ImagesAndPull(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, exists)
 
-	require.NoError(t, r.PullImage(ctx, testImage))
+	require.NoError(t, r.PullImage(ctx, testImage, nil))
 
 	images, err := r.ListImages(ctx)
 	require.NoError(t, err)
@@ -259,7 +259,7 @@ func TestRepository_ImagesAndPull(t *testing.T) {
 
 func TestRepository_PullImage_InvalidTag(t *testing.T) {
 	r, ctx := testRepo(t)
-	err := r.PullImage(ctx, "agentbox/definitely-not-a-real-image:latest")
+	err := r.PullImage(ctx, "agentbox/definitely-not-a-real-image:latest", nil)
 	assert.Error(t, err)
 }
 

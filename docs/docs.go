@@ -1131,7 +1131,7 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Initiates pulling an image from the container registry in the background; poll HEAD /images to check the result. Uses the credentials configured under ` + "`" + `registries` + "`" + ` in config.yaml for the image's registry host, and pulls anonymously for unlisted hosts.",
+                "description": "Initiates pulling an image from the container registry in the background; poll HEAD /images to check the result. Credentials: the optional ` + "`" + `registry_auth` + "`" + ` in the body is used for this pull only; otherwise the credentials configured under ` + "`" + `registries` + "`" + ` in config.yaml for the image's registry host; otherwise anonymous.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1461,7 +1461,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Pulls the image (must be from the repository the container already runs; uses configured ` + "`" + `registries` + "`" + ` credentials), then recreates the container from its existing config. Blocks until done; the old container is restored if the new one fails to start. A stopped container stays stopped. Only mounted when webhook_api_key is configured; the main X-API-KEY is not accepted here. Returns 409 if a redeploy of the same container is already running.",
+                "description": "Pulls the image (must be from the repository the container already runs; uses ` + "`" + `registry_auth` + "`" + ` from the body if given, else configured ` + "`" + `registries` + "`" + ` credentials), then recreates the container from its existing config. Blocks until done; the old container is restored if the new one fails to start. A stopped container stays stopped. Only mounted when webhook_api_key is configured; the main X-API-KEY is not accepted here. Returns 409 if a redeploy of the same container is already running.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1959,6 +1959,27 @@ const docTemplate = `{
                 "image": {
                     "type": "string",
                     "example": "nginx:latest"
+                },
+                "registry_auth": {
+                    "description": "RegistryAuth optionally overrides the node-configured credential for\nthis pull only.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/handler.RegistryAuthPayload"
+                        }
+                    ]
+                }
+            }
+        },
+        "handler.RegistryAuthPayload": {
+            "type": "object",
+            "properties": {
+                "password": {
+                    "type": "string",
+                    "example": "ghp_xxx"
+                },
+                "username": {
+                    "type": "string",
+                    "example": "bot"
                 }
             }
         },
@@ -2072,6 +2093,14 @@ const docTemplate = `{
                 "image": {
                     "type": "string",
                     "example": "ghcr.io/acme/app:sha-abc123"
+                },
+                "registry_auth": {
+                    "description": "RegistryAuth optionally overrides the node-configured credential for the pull.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/handler.RegistryAuthPayload"
+                        }
+                    ]
                 }
             }
         }

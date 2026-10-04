@@ -751,7 +751,7 @@ func (h *ContainerHandler) CheckImage(w http.ResponseWriter, r *http.Request) {
 
 // PullImage godoc
 // @Summary      Pull a container image
-// @Description  Initiates pulling an image from the container registry in the background; poll HEAD /images to check the result. Uses the credentials configured under `registries` in config.yaml for the image's registry host, and pulls anonymously for unlisted hosts.
+// @Description  Initiates pulling an image from the container registry in the background; poll HEAD /images to check the result. Credentials: the optional `registry_auth` in the body is used for this pull only; otherwise the credentials configured under `registries` in config.yaml for the image's registry host; otherwise anonymous.
 // @Tags         images
 // @Accept       json
 // @Produce      json
@@ -771,13 +771,25 @@ func (h *ContainerHandler) PullImage(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "image is required", http.StatusBadRequest)
 		return
 	}
+	// Validate up front: the pull runs in the background after the 202, so a
+	// bad credential would otherwise fail silently.
+	auth := req.RegistryAuth.toDomain()
+	if auth != nil && (auth.Username == "" || auth.Password == "") {
+		jsonError(w, "registry_auth requires username and password", http.StatusBadRequest)
+		return
+	}
 
-	// Dedupe: if this image is already being pulled, don't start a second
-	// concurrent pull for it — just let the caller poll HEAD /images as usual.
+	// Dedupe: if this image is already being pulled (with the same
+	// credential identity), don't start a second concurrent pull for it —
+	// just let the caller poll HEAD /images as usual.
+	key := req.Image
+	if auth != nil {
+		key += "\x00" + auth.Username
+	}
 	h.pullMu.Lock()
-	alreadyPulling := h.pullsInFlight[req.Image]
+	alreadyPulling := h.pullsInFlight[key]
 	if !alreadyPulling {
-		h.pullsInFlight[req.Image] = true
+		h.pullsInFlight[key] = true
 	}
 	h.pullMu.Unlock()
 
@@ -788,12 +800,12 @@ func (h *ContainerHandler) PullImage(w http.ResponseWriter, r *http.Request) {
 		go func() {
 			defer func() {
 				h.pullMu.Lock()
-				delete(h.pullsInFlight, req.Image)
+				delete(h.pullsInFlight, key)
 				h.pullMu.Unlock()
 			}()
 			ctx, cancel := context.WithTimeout(context.Background(), pullTimeout)
 			defer cancel()
-			if err := h.uc.PullImage(ctx, req.Image); err != nil {
+			if err := h.uc.PullImage(ctx, req.Image, auth); err != nil {
 				h.log.WithError(err).WithField("image", req.Image).Error("Background image pull failed")
 			}
 		}()
@@ -804,7 +816,7 @@ func (h *ContainerHandler) PullImage(w http.ResponseWriter, r *http.Request) {
 
 // WebhookDeploy godoc
 // @Summary      Redeploy a container with a new image
-// @Description  Pulls the image (must be from the repository the container already runs; uses configured `registries` credentials), then recreates the container from its existing config. Blocks until done; the old container is restored if the new one fails to start. A stopped container stays stopped. Only mounted when webhook_api_key is configured; the main X-API-KEY is not accepted here. Returns 409 if a redeploy of the same container is already running.
+// @Description  Pulls the image (must be from the repository the container already runs; uses `registry_auth` from the body if given, else configured `registries` credentials), then recreates the container from its existing config. Blocks until done; the old container is restored if the new one fails to start. A stopped container stays stopped. Only mounted when webhook_api_key is configured; the main X-API-KEY is not accepted here. Returns 409 if a redeploy of the same container is already running.
 // @Tags         webhook
 // @Accept       json
 // @Produce      json
@@ -835,7 +847,7 @@ func (h *ContainerHandler) WebhookDeploy(w http.ResponseWriter, r *http.Request)
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), pullTimeout+5*time.Minute)
 	defer cancel()
 
-	result, err := h.uc.RedeployImage(ctx, name, req.Image)
+	result, err := h.uc.RedeployImage(ctx, name, req.Image, req.RegistryAuth.toDomain())
 	if err != nil {
 		handleError(w, err)
 		return

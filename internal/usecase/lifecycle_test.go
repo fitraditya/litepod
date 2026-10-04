@@ -674,7 +674,7 @@ func TestPrepareVolume_Error(t *testing.T) {
 func TestImageOps(t *testing.T) {
 	repo := &mockRepo{
 		ImageExistsFunc: func(ctx context.Context, image string) (bool, error) { return true, nil },
-		PullImageFunc:   func(ctx context.Context, image string) error { return nil },
+		PullImageFunc:   func(ctx context.Context, image string, auth *domain.RegistryAuth) error { return nil },
 		ListImagesFunc: func(ctx context.Context) ([]domain.ImageSummary, error) {
 			return []domain.ImageSummary{{ID: "sha256:abc", RepoTags: []string{"nginx:latest"}}}, nil
 		},
@@ -685,7 +685,7 @@ func TestImageOps(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, exists)
 
-	require.NoError(t, uc.PullImage(context.Background(), "nginx"))
+	require.NoError(t, uc.PullImage(context.Background(), "nginx", nil))
 
 	imgs, err := uc.ListImages(context.Background())
 	require.NoError(t, err)
@@ -711,7 +711,10 @@ func TestRedeployImage(t *testing.T) {
 		var calls []string
 		return &mockRepo{
 			ContainerImageFunc: func(ctx context.Context, name string) (string, error) { return "ghcr.io/a/b:v1", nil },
-			PullImageFunc:      func(ctx context.Context, image string) error { calls = append(calls, "pull"); return nil },
+			PullImageFunc: func(ctx context.Context, image string, auth *domain.RegistryAuth) error {
+				calls = append(calls, "pull")
+				return nil
+			},
 			RedeployFunc: func(ctx context.Context, name, image string) (string, error) {
 				calls = append(calls, "redeploy:"+image)
 				return "newid", nil
@@ -721,15 +724,32 @@ func TestRedeployImage(t *testing.T) {
 
 	t.Run("pulls then redeploys", func(t *testing.T) {
 		repo, calls := newRepo()
-		res, err := newTestUC(repo, nil, nil).RedeployImage(context.Background(), "app", "ghcr.io/a/b:v2")
+		res, err := newTestUC(repo, nil, nil).RedeployImage(context.Background(), "app", "ghcr.io/a/b:v2", nil)
 		require.NoError(t, err)
 		assert.Equal(t, "newid", res.ContainerID)
 		assert.Equal(t, []string{"pull", "redeploy:ghcr.io/a/b:v2"}, *calls)
 	})
 
+	t.Run("forwards registry auth to pull", func(t *testing.T) {
+		repo, _ := newRepo()
+		var got *domain.RegistryAuth
+		repo.PullImageFunc = func(ctx context.Context, image string, auth *domain.RegistryAuth) error { got = auth; return nil }
+		want := &domain.RegistryAuth{Username: "u", Password: "p"}
+		_, err := newTestUC(repo, nil, nil).RedeployImage(context.Background(), "app", "ghcr.io/a/b:v2", want)
+		require.NoError(t, err)
+		assert.Equal(t, want, got)
+	})
+
+	t.Run("rejects incomplete registry auth", func(t *testing.T) {
+		repo, calls := newRepo()
+		_, err := newTestUC(repo, nil, nil).RedeployImage(context.Background(), "app", "ghcr.io/a/b:v2", &domain.RegistryAuth{Username: "u"})
+		assert.ErrorIs(t, err, domain.ErrInvalidInput)
+		assert.Empty(t, *calls)
+	})
+
 	t.Run("rejects different repository", func(t *testing.T) {
 		repo, calls := newRepo()
-		_, err := newTestUC(repo, nil, nil).RedeployImage(context.Background(), "app", "evil/miner:latest")
+		_, err := newTestUC(repo, nil, nil).RedeployImage(context.Background(), "app", "evil/miner:latest", nil)
 		assert.ErrorIs(t, err, domain.ErrInvalidInput)
 		assert.Empty(t, *calls)
 	})
@@ -737,16 +757,16 @@ func TestRedeployImage(t *testing.T) {
 	t.Run("rejects empty and whitespace image", func(t *testing.T) {
 		repo, _ := newRepo()
 		uc := newTestUC(repo, nil, nil)
-		_, err := uc.RedeployImage(context.Background(), "app", "")
+		_, err := uc.RedeployImage(context.Background(), "app", "", nil)
 		assert.ErrorIs(t, err, domain.ErrInvalidInput)
-		_, err = uc.RedeployImage(context.Background(), "app", "ghcr.io/a/b:v2 --x")
+		_, err = uc.RedeployImage(context.Background(), "app", "ghcr.io/a/b:v2 --x", nil)
 		assert.ErrorIs(t, err, domain.ErrInvalidInput)
 	})
 
 	t.Run("pull failure leaves container alone", func(t *testing.T) {
 		repo, calls := newRepo()
-		repo.PullImageFunc = func(ctx context.Context, image string) error { return errors.New("denied") }
-		_, err := newTestUC(repo, nil, nil).RedeployImage(context.Background(), "app", "ghcr.io/a/b:v2")
+		repo.PullImageFunc = func(ctx context.Context, image string, auth *domain.RegistryAuth) error { return errors.New("denied") }
+		_, err := newTestUC(repo, nil, nil).RedeployImage(context.Background(), "app", "ghcr.io/a/b:v2", nil)
 		assert.ErrorIs(t, err, domain.ErrInvalidInput)
 		assert.Empty(t, *calls)
 	})
@@ -754,7 +774,7 @@ func TestRedeployImage(t *testing.T) {
 	t.Run("concurrent redeploy conflicts", func(t *testing.T) {
 		repo, _ := newRepo()
 		started, release := make(chan struct{}), make(chan struct{})
-		repo.PullImageFunc = func(ctx context.Context, image string) error {
+		repo.PullImageFunc = func(ctx context.Context, image string, auth *domain.RegistryAuth) error {
 			close(started)
 			<-release
 			return nil
@@ -762,11 +782,11 @@ func TestRedeployImage(t *testing.T) {
 		uc := newTestUC(repo, nil, nil)
 		done := make(chan error)
 		go func() {
-			_, err := uc.RedeployImage(context.Background(), "app", "ghcr.io/a/b:v2")
+			_, err := uc.RedeployImage(context.Background(), "app", "ghcr.io/a/b:v2", nil)
 			done <- err
 		}()
 		<-started
-		_, err := uc.RedeployImage(context.Background(), "app", "ghcr.io/a/b:v3")
+		_, err := uc.RedeployImage(context.Background(), "app", "ghcr.io/a/b:v3", nil)
 		assert.ErrorIs(t, err, domain.ErrConflict)
 		close(release)
 		assert.NoError(t, <-done)

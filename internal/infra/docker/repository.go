@@ -59,8 +59,8 @@ func (r *Repository) WithRegistryAuth(creds map[string]RegistryCredential) *Repo
 // pullAuth returns the base64 X-Registry-Auth value for imageName's registry,
 // or "" if no credentials are configured for it. The Docker daemon doesn't
 // read ~/.docker/config.json — credentials must accompany each pull request.
-func (r *Repository) pullAuth(imageName string) (string, error) {
-	if len(r.registryAuth) == 0 {
+func (r *Repository) pullAuth(imageName string, override *domain.RegistryAuth) (string, error) {
+	if override == nil && len(r.registryAuth) == 0 {
 		return "", nil
 	}
 	ref, err := reference.ParseNormalizedNamed(imageName)
@@ -69,6 +69,9 @@ func (r *Repository) pullAuth(imageName string) (string, error) {
 	}
 	host := reference.Domain(ref)
 	c, ok := r.registryAuth[host]
+	if override != nil {
+		c, ok = RegistryCredential{Username: override.Username, Password: override.Password}, true
+	}
 	if !ok {
 		return "", nil
 	}
@@ -322,8 +325,8 @@ func (r *Repository) ImageExists(ctx context.Context, imageName string) (bool, e
 // as soon as the request is accepted — actual failures (bad tag, rate limit,
 // auth) show up as an "error" field inside the stream, not as a Go error, so
 // the stream must be decoded and inspected rather than just drained.
-func (r *Repository) PullImage(ctx context.Context, imageName string) error {
-	auth, err := r.pullAuth(imageName)
+func (r *Repository) PullImage(ctx context.Context, imageName string, override *domain.RegistryAuth) error {
+	auth, err := r.pullAuth(imageName, override)
 	if err != nil {
 		return err
 	}

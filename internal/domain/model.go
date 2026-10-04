@@ -38,6 +38,13 @@ type HealthcheckSpec struct {
 }
 
 // DeployRequest is the raw input for the deploy / update use cases.
+// RegistryAuth is a per-request credential for pulling from a registry. It
+// overrides any node-wide credential configured for the same registry.
+type RegistryAuth struct {
+	Username string
+	Password string
+}
+
 type DeployRequest struct {
 	Image             string            `json:"image"`
 	Name              string            `json:"name"`

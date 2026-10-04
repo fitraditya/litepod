@@ -41,7 +41,7 @@ type ContainerRepo interface {
 
 	// Image Management
 	ImageExists(ctx context.Context, image string) (bool, error)
-	PullImage(ctx context.Context, image string) error
+	PullImage(ctx context.Context, image string, auth *RegistryAuth) error
 	ListImages(ctx context.Context) ([]ImageSummary, error)
 }
 

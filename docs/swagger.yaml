@@ -290,6 +290,21 @@ definitions:
       image:
         example: nginx:latest
         type: string
+      registry_auth:
+        allOf:
+        - $ref: '#/definitions/handler.RegistryAuthPayload'
+        description: |-
+          RegistryAuth optionally overrides the node-configured credential for
+          this pull only.
+    type: object
+  handler.RegistryAuthPayload:
+    properties:
+      password:
+        example: ghp_xxx
+        type: string
+      username:
+        example: bot
+        type: string
     type: object
   handler.ResourceListResponse:
     properties:
@@ -369,6 +384,11 @@ definitions:
       image:
         example: ghcr.io/acme/app:sha-abc123
         type: string
+      registry_auth:
+        allOf:
+        - $ref: '#/definitions/handler.RegistryAuthPayload'
+        description: RegistryAuth optionally overrides the node-configured credential
+          for the pull.
     type: object
 info:
   contact: {}
@@ -1099,10 +1119,11 @@ paths:
     post:
       consumes:
       - application/json
-      description: Initiates pulling an image from the container registry in the background;
-        poll HEAD /images to check the result. Uses the credentials configured under
-        `registries` in config.yaml for the image's registry host, and pulls anonymously
-        for unlisted hosts.
+      description: 'Initiates pulling an image from the container registry in the
+        background; poll HEAD /images to check the result. Credentials: the optional
+        `registry_auth` in the body is used for this pull only; otherwise the credentials
+        configured under `registries` in config.yaml for the image''s registry host;
+        otherwise anonymous.'
       parameters:
       - description: Pull image request
         in: body
@@ -1311,11 +1332,12 @@ paths:
       consumes:
       - application/json
       description: Pulls the image (must be from the repository the container already
-        runs; uses configured `registries` credentials), then recreates the container
-        from its existing config. Blocks until done; the old container is restored
-        if the new one fails to start. A stopped container stays stopped. Only mounted
-        when webhook_api_key is configured; the main X-API-KEY is not accepted here.
-        Returns 409 if a redeploy of the same container is already running.
+        runs; uses `registry_auth` from the body if given, else configured `registries`
+        credentials), then recreates the container from its existing config. Blocks
+        until done; the old container is restored if the new one fails to start. A
+        stopped container stays stopped. Only mounted when webhook_api_key is configured;
+        the main X-API-KEY is not accepted here. Returns 409 if a redeploy of the
+        same container is already running.
       parameters:
       - description: Container name
         in: path

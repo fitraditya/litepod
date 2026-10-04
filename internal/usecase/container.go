@@ -188,6 +188,15 @@ func (uc *ContainerUseCase) Update(ctx context.Context, name string, req domain.
 	return &domain.DeployResult{ContainerID: id, NodeID: uc.cfg.NodeID}, nil
 }
 
+// validateRegistryAuth rejects a per-request credential with an empty field
+// (nil means "use the node-configured credential, if any").
+func validateRegistryAuth(a *domain.RegistryAuth) error {
+	if a != nil && (a.Username == "" || a.Password == "") {
+		return fmt.Errorf("%w: registry_auth requires username and password", domain.ErrInvalidInput)
+	}
+	return nil
+}
+
 // imageRepo strips the tag and digest from an image reference, leaving the
 // repository (registry host + path) — "ghcr.io/a/b:v1@sha256:x" -> "ghcr.io/a/b".
 func imageRepo(ref string) string {
@@ -206,11 +215,15 @@ func imageRepo(ref string) string {
 // webhook credential can roll tags forward but can't swap in an arbitrary
 // image. Pulling happens before anything is touched, so a failed pull leaves
 // the running container alone.
-func (uc *ContainerUseCase) RedeployImage(ctx context.Context, name, image string) (*domain.DeployResult, error) {
+func (uc *ContainerUseCase) RedeployImage(ctx context.Context, name, image string, auth *domain.RegistryAuth) (*domain.DeployResult, error) {
 	log := logger.FromContext(ctx, uc.log).WithFields(logger.Fields{"op": "redeploy", "container": name, "image": image})
 
 	if image == "" || strings.ContainsAny(image, " \t\r\n") {
 		return nil, fmt.Errorf("%w: invalid image reference", domain.ErrInvalidInput)
+	}
+
+	if err := validateRegistryAuth(auth); err != nil {
+		return nil, err
 	}
 
 	uc.mu.Lock()
@@ -236,7 +249,7 @@ func (uc *ContainerUseCase) RedeployImage(ctx context.Context, name, image strin
 		return nil, fmt.Errorf("%w: image must be from repository %q", domain.ErrInvalidInput, imageRepo(current))
 	}
 
-	if err := uc.repo.PullImage(ctx, image); err != nil {
+	if err := uc.repo.PullImage(ctx, image, auth); err != nil {
 		log.WithError(err).Error("Pull failed")
 		return nil, fmt.Errorf("%w: %v", domain.ErrInvalidInput, err)
 	}
@@ -838,8 +851,11 @@ func (uc *ContainerUseCase) ImageExists(ctx context.Context, image string) (bool
 	return uc.repo.ImageExists(ctx, image)
 }
 
-func (uc *ContainerUseCase) PullImage(ctx context.Context, image string) error {
-	return uc.repo.PullImage(ctx, image)
+func (uc *ContainerUseCase) PullImage(ctx context.Context, image string, auth *domain.RegistryAuth) error {
+	if err := validateRegistryAuth(auth); err != nil {
+		return err
+	}
+	return uc.repo.PullImage(ctx, image, auth)
 }
 
 func (uc *ContainerUseCase) ListImages(ctx context.Context) ([]domain.ImageSummary, error) {

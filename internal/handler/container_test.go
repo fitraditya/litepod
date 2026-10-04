@@ -404,9 +404,27 @@ func TestPullImageHandler(t *testing.T) {
 		rec := doJSON(t, h.PullImage, http.MethodPost, "/images/pull", PullImagePayload{})
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
 	})
+	t.Run("incomplete registry_auth rejected", func(t *testing.T) {
+		h, _ := newTestHandler(nil, nil, nil)
+		rec := doJSON(t, h.PullImage, http.MethodPost, "/images/pull",
+			PullImagePayload{Image: "nginx", RegistryAuth: &RegistryAuthPayload{Username: "u"}})
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+	t.Run("registry_auth forwarded to repo", func(t *testing.T) {
+		got := make(chan *domain.RegistryAuth, 1)
+		repo := &mockRepo{PullImageFunc: func(ctx context.Context, image string, auth *domain.RegistryAuth) error {
+			got <- auth
+			return nil
+		}}
+		h, _ := newTestHandler(repo, nil, nil)
+		rec := doJSON(t, h.PullImage, http.MethodPost, "/images/pull",
+			PullImagePayload{Image: "ghcr.io/a/b", RegistryAuth: &RegistryAuthPayload{Username: "u", Password: "p"}})
+		assert.Equal(t, http.StatusAccepted, rec.Code)
+		assert.Equal(t, &domain.RegistryAuth{Username: "u", Password: "p"}, <-got)
+	})
 	t.Run("accepted", func(t *testing.T) {
 		done := make(chan struct{})
-		repo := &mockRepo{PullImageFunc: func(ctx context.Context, image string) error {
+		repo := &mockRepo{PullImageFunc: func(ctx context.Context, image string, auth *domain.RegistryAuth) error {
 			close(done)
 			return nil
 		}}

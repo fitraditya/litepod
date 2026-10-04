@@ -9,7 +9,8 @@ Litepod is a per-node HTTP agent that manages Docker containers on a single host
 - Admission control: rejects deploys/updates that would exceed configured node memory/CPU capacity or conflict on a host port, tracked in-memory across concurrent in-flight requests
 - Volumes: create/delete/list, host-bind mounts scoped under a configurable base path
 - Networks: create/delete/list
-- Images: exists check, list, background pull (bounded timeout, stream-decoded so registry failures are actually caught)
+- Images: exists check, list, background pull (bounded timeout, stream-decoded so registry failures are actually caught), private/custom registry credentials ([details](#private-registries))
+- CI redeploys: a separately-keyed `/webhook` endpoint that pulls a new image tag and recreates the container from its existing config, with rollback ([details](#webhook-ci-redeploys))
 - Deploy requests cover most of the Docker Engine container-create surface — resources, storage, networking, lifecycle, and hardening options. See [Deploy request fields](#deploy-request-fields) below.
 - Structured logging via [obrel/go-lib](https://github.com/obrel/go-lib) with optional Sentry error reporting
 - Sensitive env vars (`DOCKER_HOST`, `AGENT_KEY`, `AGENT_BOX_API_KEY`) stripped from any container env passed in a deploy request
@@ -40,6 +41,8 @@ sentry_dsn: ""   # optional; leave empty to disable Sentry error reporting
 | Max CPU (cores)    | `max_cpu_units`        | Node CPU ceiling for admission control                  |
 | Deploy port range  | `deploy_port_range`    | `{min, max}`; restricts host ports a deployed container may bind to (unset = unrestricted) |
 | Volume base path   | `volume_base`          | Host directory root that host-bind volume paths are validated against (default `/home/deployer/data/`) |
+| Webhook API key    | `webhook_api_key`      | Optional; enables the `/webhook/*` routes, checked via `Authorization: Bearer`. Must differ from `api_key`. Unset = routes not mounted |
+| Registries         | `registries`           | Optional map of registry host → `{username, password}` used for image pulls. See [Private registries](#private-registries) |
 | Sentry DSN         | `sentry_dsn`           | Optional; enables Sentry error reporting when set        |
 | Port               | `port`                 | Optional. Listen port; if unset defaults to `8080` (plain) or `8443` (when `TLS_CERT_FILE`/`TLS_KEY_FILE` are set) |
 
@@ -48,6 +51,7 @@ sentry_dsn: ""   # optional; leave empty to disable Sentry error reporting
 | Variable              | Overrides                                    |
 |------------------------|-----------------------------------------------|
 | `AGENT_BOX_API_KEY`    | `api_key`                                      |
+| `WEBHOOK_API_KEY`      | `webhook_api_key`                              |
 | `DEPLOY_PORT_RANGE`    | `deploy_port_range` (format `"min-max"`)       |
 | `VOLUME_BASE`          | `volume_base`                                  |
 | `SENTRY_DSN`           | `sentry_dsn`                                   |
@@ -116,7 +120,9 @@ See the comments in `scripts/litepod.service` for config file location, optional
 
 ## API overview
 
-All routes except `/health` and `/swagger/*` require an `X-API-KEY` header matching the configured `api_key`.
+All routes except `/health`, `/swagger/*` and `/webhook/*` require an `X-API-KEY` header matching the configured `api_key`. `/webhook/*` has its own credential (see [Webhook](#webhook-ci-redeploys)). A missing or wrong key returns `401`.
+
+Docker errors are mapped to HTTP statuses: not found → `404`, conflict (e.g. duplicate container name, killing a stopped container) → `409`, invalid input (including deploying an image that isn't on the node) → `422`; anything else is `500`.
 
 | Method & Path                              | Purpose                                 |
 |---------------------------------------------|-------------------------------------------|
@@ -140,9 +146,62 @@ All routes except `/health` and `/swagger/*` require an `X-API-KEY` header match
 | `GET /containers/{name}/logs`                | Recent stdout/stderr (`?tail=`, `?timestamps=`) |
 | `HEAD /images`                               | Check image existence (`?name=`)            |
 | `GET /images`                                | List locally cached images                  |
-| `POST /images/pull`                          | Pull an image (background, bounded timeout) |
+| `POST /images/pull`                          | Pull an image (background, bounded timeout); optional per-request `registry_auth` |
+| `POST /webhook/containers/{name}/deploy`     | Pull a new image and recreate the container (Bearer auth, see below) |
 | `GET /networks`, `POST /networks`, `DELETE /networks/{name}` | Docker networks on this node |
 | `GET /volumes`, `POST /volumes`, `DELETE /volumes/{name}`     | Docker volumes on this node |
+
+`POST /containers` and `PUT /containers/{name}` do **not** pull images — the image must already be on the node (call `POST /images/pull` first), otherwise the request fails with `422`.
+
+### Webhook (CI redeploys)
+
+`POST /webhook/containers/{name}/deploy` rolls a running container forward to a new image tag, for CI systems such as GitHub Actions. It's enabled only when `webhook_api_key` is set, and uses its own credential: the webhook key does not open any other route, and the main `X-API-KEY` is not accepted here.
+
+```bash
+curl -fsS --max-time 900 -X POST "https://$NODE/webhook/containers/myapp/deploy" \
+  -H "Authorization: Bearer $WEBHOOK_KEY" \
+  -d '{"image": "ghcr.io/acme/app:sha-abc123"}'
+```
+
+- `{name}` is the container name used in the original deploy.
+- The image must come from the same repository the container already runs (the tag/digest may change), so a leaked webhook key can't be used to run an arbitrary image.
+- The agent pulls the image (blocking), then recreates the container from its **existing** config — ports, env, volumes and limits are kept. The old container is stopped and renamed aside, and removed only once the new one has started; if create/start fails it is restored. A stopped container stays stopped.
+- One redeploy per container at a time (`409` otherwise). It continues even if the client disconnects.
+- Not carried over: anonymous volumes; `command`/`entrypoint` come from the old container rather than the new image's defaults. There is no health-check wait after start.
+- Use HTTPS — the key travels in a header.
+
+GitHub Actions example (short-lived token, no PAT stored on the node):
+
+```yaml
+permissions:
+  packages: read
+steps:
+  - run: |
+      curl -fsS --max-time 900 -X POST "https://${{ secrets.NODE_HOST }}/webhook/containers/myapp/deploy" \
+        -H "Authorization: Bearer ${{ secrets.WEBHOOK_KEY }}" \
+        -d '{"image":"ghcr.io/${{ github.repository }}:${{ github.sha }}",
+             "registry_auth":{"username":"${{ github.actor }}","password":"${{ secrets.GITHUB_TOKEN }}"}}'
+```
+
+### Private registries
+
+Custom registries work by putting the host in the image reference (`registry.example.com/team/app:v2`). For private registries the agent must send credentials with each pull — the Docker daemon does not read `~/.docker/config.json`. Credentials are resolved per pull in this order:
+
+1. `registry_auth` in the request body of `POST /images/pull` or the webhook (`{"username": "...", "password": "<password or token>"}`) — used for that pull only.
+2. The matching entry under `registries` in `config.yaml`:
+   ```yaml
+   registries:
+     ghcr.io:
+       username: "your-github-user"
+       password: "ghp_xxx"        # PAT with read:packages
+     registry.example.com:5000:
+       username: "bot"
+       password: "secret"
+   ```
+   Keys are the registry host (with port if any); `docker.io` covers Docker Hub. Keep `config.yaml` `chmod 600`.
+3. Anonymous.
+
+Registries served over plain HTTP or with a self-signed certificate must additionally be allowed in the Docker daemon's own configuration (`insecure-registries` or `/etc/docker/certs.d/`).
 
 Full request/response schemas: `docs/swagger.json` / `docs/swagger.yaml`, or `/swagger/index.html` when the agent is running.
 
