@@ -41,6 +41,7 @@ type ContainerUseCase struct {
 	log  *logger.Logger
 
 	mu           sync.Mutex             // guards reservations and the check-then-reserve admission step below
+	redeploying  map[string]bool        // containers with a webhook redeploy in flight, guarded by mu
 	reservations map[string]reservation // pending allocations for in-flight deploys/updates, keyed by container name
 }
 
@@ -50,7 +51,7 @@ func NewContainerUseCase(
 	cfg *config.Config,
 	log *logger.Logger,
 ) *ContainerUseCase {
-	return &ContainerUseCase{repo: repo, sys: sys, cfg: cfg, log: log, reservations: make(map[string]reservation)}
+	return &ContainerUseCase{repo: repo, sys: sys, cfg: cfg, log: log, reservations: make(map[string]reservation), redeploying: make(map[string]bool)}
 }
 
 // reserve records a pending allocation for name. Must be called with uc.mu held.
@@ -184,6 +185,69 @@ func (uc *ContainerUseCase) Update(ctx context.Context, name string, req domain.
 	}
 
 	log.WithField("container_id", id).Info("Container updated")
+	return &domain.DeployResult{ContainerID: id, NodeID: uc.cfg.NodeID}, nil
+}
+
+// imageRepo strips the tag and digest from an image reference, leaving the
+// repository (registry host + path) — "ghcr.io/a/b:v1@sha256:x" -> "ghcr.io/a/b".
+func imageRepo(ref string) string {
+	if i := strings.Index(ref, "@"); i >= 0 {
+		ref = ref[:i]
+	}
+	if i := strings.LastIndex(ref, ":"); i > strings.LastIndex(ref, "/") {
+		ref = ref[:i]
+	}
+	return ref
+}
+
+// RedeployImage pulls image and recreates the named container from its
+// current config with that image. The image must belong to the same
+// repository the container already runs, so a holder of the (narrowly scoped)
+// webhook credential can roll tags forward but can't swap in an arbitrary
+// image. Pulling happens before anything is touched, so a failed pull leaves
+// the running container alone.
+func (uc *ContainerUseCase) RedeployImage(ctx context.Context, name, image string) (*domain.DeployResult, error) {
+	log := logger.FromContext(ctx, uc.log).WithFields(logger.Fields{"op": "redeploy", "container": name, "image": image})
+
+	if image == "" || strings.ContainsAny(image, " \t\r\n") {
+		return nil, fmt.Errorf("%w: invalid image reference", domain.ErrInvalidInput)
+	}
+
+	uc.mu.Lock()
+	if uc.redeploying[name] {
+		uc.mu.Unlock()
+		return nil, fmt.Errorf("%w: redeploy already in progress for %q", domain.ErrConflict, name)
+	}
+	uc.redeploying[name] = true
+	uc.mu.Unlock()
+	defer func() {
+		uc.mu.Lock()
+		delete(uc.redeploying, name)
+		uc.mu.Unlock()
+	}()
+
+	current, err := uc.repo.ContainerImage(ctx, name)
+	if err != nil {
+		log.WithError(err).Error("Inspect failed before redeploy")
+		return nil, err
+	}
+	if imageRepo(current) != imageRepo(image) {
+		log.WithField("current_image", current).Warn("Redeploy rejected: image repository differs")
+		return nil, fmt.Errorf("%w: image must be from repository %q", domain.ErrInvalidInput, imageRepo(current))
+	}
+
+	if err := uc.repo.PullImage(ctx, image); err != nil {
+		log.WithError(err).Error("Pull failed")
+		return nil, fmt.Errorf("%w: %v", domain.ErrInvalidInput, err)
+	}
+
+	id, err := uc.repo.Redeploy(ctx, name, image)
+	if err != nil {
+		log.WithError(err).Error("Redeploy failed")
+		return nil, err
+	}
+
+	log.WithFields(logger.Fields{"container_id": id, "previous_image": current}).Info("Container redeployed")
 	return &domain.DeployResult{ContainerID: id, NodeID: uc.cfg.NodeID}, nil
 }
 

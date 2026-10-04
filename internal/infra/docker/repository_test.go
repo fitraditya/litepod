@@ -376,3 +376,61 @@ func TestNewRepository(t *testing.T) {
 	r, _ := testRepo(t)
 	assert.NotNil(t, r)
 }
+
+func TestRedeploy(t *testing.T) {
+	r, ctx := testRepo(t)
+	name := uniqueName(t)
+	oldID, err := r.Run(ctx, domain.DeploySpec{
+		Image:         testImage,
+		Name:          name,
+		Env:           []string{"FOO=bar"},
+		Labels:        map[string]string{"k": "v"},
+		MemoryLimit:   64 * 1024 * 1024,
+		RestartPolicy: "no",
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = r.Remove(context.Background(), name, true, true) })
+
+	// A second tag of the same image stands in for a newly pushed version.
+	newRef := "agentbox-test-redeploy:v2"
+	require.NoError(t, r.cli.ImageTag(ctx, testImage, newRef))
+	t.Cleanup(func() { _, _ = r.cli.ImageRemove(context.Background(), newRef, image.RemoveOptions{}) })
+
+	t.Run("failure rolls back", func(t *testing.T) {
+		_, err := r.Redeploy(ctx, name, "agentbox-test-does-not-exist:nope")
+		require.Error(t, err)
+		st, err := r.State(ctx, name)
+		require.NoError(t, err)
+		assert.True(t, st.Running, "original container must be running again")
+		img, err := r.ContainerImage(ctx, name)
+		require.NoError(t, err)
+		assert.Equal(t, testImage, img)
+	})
+
+	t.Run("success swaps image and keeps config", func(t *testing.T) {
+		newID, err := r.Redeploy(ctx, name, newRef)
+		require.NoError(t, err)
+		assert.NotEqual(t, oldID, newID)
+
+		ins, err := r.cli.ContainerInspect(ctx, name)
+		require.NoError(t, err)
+		assert.Equal(t, newID, ins.ID)
+		assert.Equal(t, newRef, ins.Config.Image)
+		assert.True(t, ins.State.Running)
+		assert.Contains(t, ins.Config.Env, "FOO=bar")
+		assert.Equal(t, "v", ins.Config.Labels["k"])
+		assert.Equal(t, int64(64*1024*1024), ins.HostConfig.Memory)
+
+		_, err = r.cli.ContainerInspect(ctx, oldID)
+		assert.Error(t, err, "old container must be gone")
+	})
+
+	t.Run("stopped container stays stopped", func(t *testing.T) {
+		require.NoError(t, r.Stop(ctx, name, 1))
+		_, err := r.Redeploy(ctx, name, testImage)
+		require.NoError(t, err)
+		st, err := r.State(ctx, name)
+		require.NoError(t, err)
+		assert.False(t, st.Running)
+	})
+}

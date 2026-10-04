@@ -165,3 +165,22 @@ api_key: "key1"
 		assert.Error(t, err)
 	})
 }
+
+func TestLoad_WebhookKey(t *testing.T) {
+	t.Setenv("WEBHOOK_API_KEY", "")
+	t.Run("from yaml", func(t *testing.T) {
+		cfg, err := Load(writeTempConfig(t, "api_key: a\nwebhook_api_key: w\n"))
+		require.NoError(t, err)
+		assert.Equal(t, "w", cfg.WebhookAPIKey)
+	})
+	t.Run("env overrides", func(t *testing.T) {
+		t.Setenv("WEBHOOK_API_KEY", "fromenv")
+		cfg, err := Load(writeTempConfig(t, "api_key: a\nwebhook_api_key: w\n"))
+		require.NoError(t, err)
+		assert.Equal(t, "fromenv", cfg.WebhookAPIKey)
+	})
+	t.Run("must differ from api key", func(t *testing.T) {
+		_, err := Load(writeTempConfig(t, "api_key: a\nwebhook_api_key: a\n"))
+		assert.Error(t, err)
+	})
+}

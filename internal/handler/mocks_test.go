@@ -22,6 +22,8 @@ type mockRepo struct {
 	ListFunc             func(ctx context.Context, all bool) ([]domain.ContainerSummary, error)
 	ResourcesFunc        func(ctx context.Context, id string) (domain.ContainerResources, error)
 	StatsFunc            func(ctx context.Context, name string) (*domain.Stats, error)
+	ContainerImageFunc   func(ctx context.Context, name string) (string, error)
+	RedeployFunc         func(ctx context.Context, name, image string) (string, error)
 	VolumePathFunc       func(ctx context.Context, name string) (string, error)
 	IPFunc               func(ctx context.Context, name string) (string, error)
 	StateFunc            func(ctx context.Context, name string) (*domain.ContainerState, error)
@@ -232,4 +234,18 @@ func (m *mockRepo) VolumeMountpoint(ctx context.Context, name string) (string, e
 	}
 	// Fresh empty dir so a default Reset never touches real data.
 	return os.MkdirTemp("", "mock-volume-")
+}
+
+func (m *mockRepo) ContainerImage(ctx context.Context, name string) (string, error) {
+	if m.ContainerImageFunc != nil {
+		return m.ContainerImageFunc(ctx, name)
+	}
+	return "", nil
+}
+
+func (m *mockRepo) Redeploy(ctx context.Context, name, image string) (string, error) {
+	if m.RedeployFunc != nil {
+		return m.RedeployFunc(ctx, name, image)
+	}
+	return "id", nil
 }

@@ -153,6 +153,11 @@ type PullImagePayload struct {
 	Image string `json:"image" example:"nginx:latest"`
 }
 
+// WebhookDeployPayload is the request body for POST /webhook/containers/{name}/deploy.
+type WebhookDeployPayload struct {
+	Image string `json:"image" example:"ghcr.io/acme/app:sha-abc123"`
+}
+
 // ImageItem mirrors domain.ImageSummary for swagger documentation.
 type ImageItem struct {
 	ID       string   `json:"id"        example:"sha256:a1b2c3d4e5f6"`

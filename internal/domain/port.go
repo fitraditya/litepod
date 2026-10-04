@@ -19,6 +19,12 @@ type ContainerRepo interface {
 	VolumePath(ctx context.Context, name string) (string, error)
 	IP(ctx context.Context, name string) (string, error)
 	State(ctx context.Context, name string) (*ContainerState, error)
+	// ContainerImage returns the image reference the container was created from.
+	ContainerImage(ctx context.Context, name string) (string, error)
+	// Redeploy recreates the container from its current config with a new
+	// image (which must already be pulled), rolling back if the new one fails
+	// to start. The container's running/stopped state is preserved.
+	Redeploy(ctx context.Context, name, image string) (id string, err error)
 	Logs(ctx context.Context, name string, tail int, timestamps bool) (string, error)
 
 	// Network Management

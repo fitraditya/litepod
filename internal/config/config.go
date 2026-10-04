@@ -35,7 +35,12 @@ type Config struct {
 	MaxCPUUnits     float64   `yaml:"max_cpu_units"`
 	DeployPortRange PortRange `yaml:"deploy_port_range"`
 	VolumeBase      string    `yaml:"volume_base"`
-	SentryDSN       string    `yaml:"sentry_dsn"`
+	// WebhookAPIKey gates the /webhook/* routes (Authorization: Bearer). It is
+	// deliberately separate from APIKey so CI systems can be handed a
+	// credential that can only redeploy a container with a new image tag.
+	// Empty = webhook routes are not mounted at all.
+	WebhookAPIKey string `yaml:"webhook_api_key"`
+	SentryDSN     string `yaml:"sentry_dsn"`
 	// Port the HTTP server listens on. Zero means "use the default for
 	// whether TLS is enabled" (see main.go: 8080 plain, 8443 with
 	// TLS_CERT_FILE/TLS_KEY_FILE set) — resolved at startup, not here, since
@@ -103,6 +108,9 @@ func Load(path string) (*Config, error) {
 	if key := os.Getenv("AGENT_BOX_API_KEY"); key != "" {
 		cfg.APIKey = key
 	}
+	if key := os.Getenv("WEBHOOK_API_KEY"); key != "" {
+		cfg.WebhookAPIKey = key
+	}
 	if v := os.Getenv("DEPLOY_PORT_RANGE"); v != "" {
 		pr, err := parsePortRange(v)
 		if err != nil {
@@ -156,6 +164,10 @@ func Load(path string) (*Config, error) {
 
 	if cfg.APIKey == "" {
 		return nil, fmt.Errorf("api_key is required (set it in config.yaml or via AGENT_BOX_API_KEY)")
+	}
+
+	if cfg.WebhookAPIKey != "" && cfg.WebhookAPIKey == cfg.APIKey {
+		return nil, fmt.Errorf("webhook_api_key must differ from api_key")
 	}
 
 	return &cfg, nil

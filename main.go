@@ -58,6 +58,10 @@ const (
 // @in                          header
 // @name                        X-API-KEY
 // @description                 API key required for all /containers endpoints
+// @securityDefinitions.apikey  BearerAuth
+// @in                          header
+// @name                        Authorization
+// @description                 "Bearer <webhook_api_key>" — required for /webhook endpoints
 func main() {
 	cfg, err := config.Load("config.yaml")
 	if err != nil {

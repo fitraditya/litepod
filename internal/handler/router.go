@@ -60,6 +60,15 @@ func NewRouter(
 		})
 	})
 
+	// Webhook routes: separate Bearer credential, narrow surface for CI.
+	// Not mounted at all unless webhook_api_key is configured.
+	if cfg.WebhookAPIKey != "" {
+		r.Route("/webhook", func(r chi.Router) {
+			r.Use(middleware.WebhookAuth(cfg))
+			r.Post("/containers/{name}/deploy", containers.WebhookDeploy)
+		})
+	}
+
 	r.Route("/images", func(r chi.Router) {
 		r.Use(middleware.Auth(cfg))
 		r.Get("/", containers.ListImages)

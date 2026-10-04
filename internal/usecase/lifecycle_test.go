@@ -697,3 +697,78 @@ func TestNewContainerUseCase(t *testing.T) {
 	assert.NotNil(t, uc)
 	assert.NotNil(t, uc.reservations)
 }
+
+func TestImageRepo(t *testing.T) {
+	assert.Equal(t, "ghcr.io/a/b", imageRepo("ghcr.io/a/b:v1"))
+	assert.Equal(t, "ghcr.io/a/b", imageRepo("ghcr.io/a/b"))
+	assert.Equal(t, "ghcr.io/a/b", imageRepo("ghcr.io/a/b:v1@sha256:abc"))
+	assert.Equal(t, "localhost:5000/app", imageRepo("localhost:5000/app:v2"))
+	assert.Equal(t, "localhost:5000/app", imageRepo("localhost:5000/app"))
+}
+
+func TestRedeployImage(t *testing.T) {
+	newRepo := func() (*mockRepo, *[]string) {
+		var calls []string
+		return &mockRepo{
+			ContainerImageFunc: func(ctx context.Context, name string) (string, error) { return "ghcr.io/a/b:v1", nil },
+			PullImageFunc:      func(ctx context.Context, image string) error { calls = append(calls, "pull"); return nil },
+			RedeployFunc: func(ctx context.Context, name, image string) (string, error) {
+				calls = append(calls, "redeploy:"+image)
+				return "newid", nil
+			},
+		}, &calls
+	}
+
+	t.Run("pulls then redeploys", func(t *testing.T) {
+		repo, calls := newRepo()
+		res, err := newTestUC(repo, nil, nil).RedeployImage(context.Background(), "app", "ghcr.io/a/b:v2")
+		require.NoError(t, err)
+		assert.Equal(t, "newid", res.ContainerID)
+		assert.Equal(t, []string{"pull", "redeploy:ghcr.io/a/b:v2"}, *calls)
+	})
+
+	t.Run("rejects different repository", func(t *testing.T) {
+		repo, calls := newRepo()
+		_, err := newTestUC(repo, nil, nil).RedeployImage(context.Background(), "app", "evil/miner:latest")
+		assert.ErrorIs(t, err, domain.ErrInvalidInput)
+		assert.Empty(t, *calls)
+	})
+
+	t.Run("rejects empty and whitespace image", func(t *testing.T) {
+		repo, _ := newRepo()
+		uc := newTestUC(repo, nil, nil)
+		_, err := uc.RedeployImage(context.Background(), "app", "")
+		assert.ErrorIs(t, err, domain.ErrInvalidInput)
+		_, err = uc.RedeployImage(context.Background(), "app", "ghcr.io/a/b:v2 --x")
+		assert.ErrorIs(t, err, domain.ErrInvalidInput)
+	})
+
+	t.Run("pull failure leaves container alone", func(t *testing.T) {
+		repo, calls := newRepo()
+		repo.PullImageFunc = func(ctx context.Context, image string) error { return errors.New("denied") }
+		_, err := newTestUC(repo, nil, nil).RedeployImage(context.Background(), "app", "ghcr.io/a/b:v2")
+		assert.ErrorIs(t, err, domain.ErrInvalidInput)
+		assert.Empty(t, *calls)
+	})
+
+	t.Run("concurrent redeploy conflicts", func(t *testing.T) {
+		repo, _ := newRepo()
+		started, release := make(chan struct{}), make(chan struct{})
+		repo.PullImageFunc = func(ctx context.Context, image string) error {
+			close(started)
+			<-release
+			return nil
+		}
+		uc := newTestUC(repo, nil, nil)
+		done := make(chan error)
+		go func() {
+			_, err := uc.RedeployImage(context.Background(), "app", "ghcr.io/a/b:v2")
+			done <- err
+		}()
+		<-started
+		_, err := uc.RedeployImage(context.Background(), "app", "ghcr.io/a/b:v3")
+		assert.ErrorIs(t, err, domain.ErrConflict)
+		close(release)
+		assert.NoError(t, <-done)
+	})
+}

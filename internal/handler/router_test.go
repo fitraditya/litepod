@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -126,4 +128,51 @@ func TestRouter_ImagesNetworksVolumesRequireAuth(t *testing.T) {
 		router.ServeHTTP(rec, req)
 		assert.Equal(t, http.StatusUnauthorized, rec.Code, path)
 	}
+}
+
+func TestRouter_Webhook(t *testing.T) {
+	post := func(router http.Handler, hdr map[string]string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/webhook/containers/app/deploy", strings.NewReader(`{"image":"ghcr.io/a/b:v2"}`))
+		for k, v := range hdr {
+			req.Header.Set(k, v)
+		}
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		return rec
+	}
+	repo := &mockRepo{ContainerImageFunc: func(ctx context.Context, name string) (string, error) { return "ghcr.io/a/b:v1", nil }}
+
+	t.Run("not mounted without webhook key", func(t *testing.T) {
+		cfg := &config.Config{NodeID: "n", APIKey: "secret"}
+		ch, hh := newTestHandler(repo, nil, cfg)
+		rec := post(NewRouter(cfg, ch, hh, testLogger()), map[string]string{"Authorization": "Bearer "})
+		assert.Equal(t, http.StatusNotFound, rec.Code)
+	})
+
+	cfg := &config.Config{NodeID: "n", APIKey: "secret", WebhookAPIKey: "hook"}
+	ch, hh := newTestHandler(repo, nil, cfg)
+	router := NewRouter(cfg, ch, hh, testLogger())
+
+	t.Run("main key rejected", func(t *testing.T) {
+		assert.Equal(t, http.StatusUnauthorized, post(router, map[string]string{"X-API-KEY": "secret"}).Code)
+	})
+	t.Run("webhook key rejected on main routes", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/containers", nil)
+		req.Header.Set("Authorization", "Bearer hook")
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	})
+	t.Run("redeploys", func(t *testing.T) {
+		rec := post(router, map[string]string{"Authorization": "Bearer hook"})
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Contains(t, rec.Body.String(), "redeployed")
+	})
+	t.Run("other repository rejected", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/webhook/containers/app/deploy", strings.NewReader(`{"image":"evil/x:1"}`))
+		req.Header.Set("Authorization", "Bearer hook")
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusUnprocessableEntity, rec.Code)
+	})
 }

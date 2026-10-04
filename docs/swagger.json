@@ -1188,6 +1188,88 @@
                     }
                 }
             }
+        },
+        "/webhook/containers/{name}/deploy": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Pulls the image (must be from the repository the container already runs), then recreates the container from its existing config. Blocks until done; the old container is restored if the new one fails to start.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "webhook"
+                ],
+                "summary": "Redeploy a container with a new image",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Container name",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "New image",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.WebhookDeployPayload"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.DeployResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -1718,6 +1800,15 @@
                     "example": "my-vol"
                 }
             }
+        },
+        "handler.WebhookDeployPayload": {
+            "type": "object",
+            "properties": {
+                "image": {
+                    "type": "string",
+                    "example": "ghcr.io/acme/app:sha-abc123"
+                }
+            }
         }
     },
     "securityDefinitions": {
@@ -1725,6 +1816,12 @@
             "description": "API key required for all /containers endpoints",
             "type": "apiKey",
             "name": "X-API-KEY",
+            "in": "header"
+        },
+        "BearerAuth": {
+            "description": "\"Bearer \u003cwebhook_api_key\u003e\" — required for /webhook endpoints",
+            "type": "apiKey",
+            "name": "Authorization",
             "in": "header"
         }
     }

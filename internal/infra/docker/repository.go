@@ -435,6 +435,89 @@ func (r *Repository) VolumePath(ctx context.Context, name string) (string, error
 	return parts[0], nil
 }
 
+// ContainerImage returns the image reference the container was created from.
+func (r *Repository) ContainerImage(ctx context.Context, name string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	ins, err := r.cli.ContainerInspect(ctx, name)
+	if err != nil {
+		return "", fmt.Errorf("inspect container %q: %w", name, err)
+	}
+	return ins.Config.Image, nil
+}
+
+// Redeploy recreates the container from its inspected config with newImage.
+// The old container is stopped and renamed aside (not removed) until the new
+// one has started, so a failed create/start rolls back to the old container.
+// A container that was stopped stays stopped.
+func (r *Repository) Redeploy(ctx context.Context, name, newImage string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 3*timeout)
+	defer cancel()
+
+	ins, err := r.cli.ContainerInspect(ctx, name)
+	if err != nil {
+		return "", fmt.Errorf("inspect container %q: %w", name, err)
+	}
+
+	cfg := ins.Config
+	cfg.Image = newImage
+	cfg.Hostname = "" // inherited hostname is the old container's short ID
+	hostCfg := ins.HostConfig
+
+	endpoints := make(map[string]*network.EndpointSettings)
+	if ins.NetworkSettings != nil {
+		for netName := range ins.NetworkSettings.Networks {
+			endpoints[netName] = &network.EndpointSettings{}
+		}
+	}
+	networkingCfg := &network.NetworkingConfig{EndpointsConfig: endpoints}
+
+	wasRunning := ins.State != nil && ins.State.Running
+	stopTimeout := 10
+	if cfg.StopTimeout != nil {
+		stopTimeout = *cfg.StopTimeout
+	}
+	if err := r.cli.ContainerStop(ctx, ins.ID, dockertypes.StopOptions{Timeout: &stopTimeout}); err != nil {
+		return "", fmt.Errorf("stop container %q: %w", name, err)
+	}
+
+	oldName := fmt.Sprintf("%s-old-%d", name, time.Now().Unix())
+	if err := r.cli.ContainerRename(ctx, ins.ID, oldName); err != nil {
+		if wasRunning {
+			_ = r.cli.ContainerStart(ctx, ins.ID, dockertypes.StartOptions{})
+		}
+		return "", fmt.Errorf("rename container %q: %w", name, err)
+	}
+
+	rollback := func() {
+		_ = r.cli.ContainerRename(ctx, ins.ID, name)
+		if wasRunning {
+			_ = r.cli.ContainerStart(ctx, ins.ID, dockertypes.StartOptions{})
+		}
+	}
+
+	resp, err := r.cli.ContainerCreate(ctx, cfg, hostCfg, networkingCfg, nil, name)
+	if err != nil {
+		rollback()
+		if cerrdefs.IsNotFound(err) {
+			return "", fmt.Errorf("%w: %v", domain.ErrInvalidInput, err)
+		}
+		return "", fmt.Errorf("create container: %w", err)
+	}
+	if wasRunning {
+		if err := r.cli.ContainerStart(ctx, resp.ID, dockertypes.StartOptions{}); err != nil {
+			_ = r.cli.ContainerRemove(ctx, resp.ID, dockertypes.RemoveOptions{Force: true})
+			rollback()
+			return "", fmt.Errorf("start container: %w", err)
+		}
+	}
+
+	// Volumes are kept (removeVols=false); the new container uses them.
+	_ = r.cli.ContainerRemove(ctx, ins.ID, dockertypes.RemoveOptions{Force: true})
+	return resp.ID, nil
+}
+
 func (r *Repository) Logs(ctx context.Context, name string, tail int, timestamps bool) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()

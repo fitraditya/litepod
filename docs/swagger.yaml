@@ -364,6 +364,12 @@ definitions:
         example: my-vol
         type: string
     type: object
+  handler.WebhookDeployPayload:
+    properties:
+      image:
+        example: ghcr.io/acme/app:sha-abc123
+        type: string
+    type: object
 info:
   contact: {}
   description: HTTP API for managing containerized services on a Litepod node.
@@ -1118,10 +1124,70 @@ paths:
       summary: Delete a volume
       tags:
       - volumes
+  /webhook/containers/{name}/deploy:
+    post:
+      consumes:
+      - application/json
+      description: Pulls the image (must be from the repository the container already
+        runs), then recreates the container from its existing config. Blocks until
+        done; the old container is restored if the new one fails to start.
+      parameters:
+      - description: Container name
+        in: path
+        name: name
+        required: true
+        type: string
+      - description: New image
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.WebhookDeployPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.DeployResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Redeploy a container with a new image
+      tags:
+      - webhook
 securityDefinitions:
   ApiKeyAuth:
     description: API key required for all /containers endpoints
     in: header
     name: X-API-KEY
+    type: apiKey
+  BearerAuth:
+    description: '"Bearer <webhook_api_key>" — required for /webhook endpoints'
+    in: header
+    name: Authorization
     type: apiKey
 swagger: "2.0"

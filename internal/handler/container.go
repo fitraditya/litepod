@@ -759,6 +759,47 @@ func (h *ContainerHandler) PullImage(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
+// WebhookDeploy godoc
+// @Summary      Redeploy a container with a new image
+// @Description  Pulls the image (must be from the repository the container already runs), then recreates the container from its existing config. Blocks until done; the old container is restored if the new one fails to start.
+// @Tags         webhook
+// @Accept       json
+// @Produce      json
+// @Param        name  path      string               true  "Container name"
+// @Param        body  body      WebhookDeployPayload true  "New image"
+// @Success      200   {object}  DeployResponse
+// @Failure      400   {object}  ErrorResponse
+// @Failure      401   {object}  ErrorResponse
+// @Failure      404   {object}  ErrorResponse
+// @Failure      409   {object}  ErrorResponse
+// @Failure      422   {object}  ErrorResponse
+// @Failure      500   {object}  ErrorResponse
+// @Security     BearerAuth
+// @Router       /webhook/containers/{name}/deploy [post]
+func (h *ContainerHandler) WebhookDeploy(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+	var req WebhookDeployPayload
+	if !h.decodeJSON(w, r, &req) {
+		return
+	}
+
+	// The pull can outlast the server's default write timeout.
+	_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(pullTimeout + 5*time.Minute))
+
+	// Detach from the request context: if the CI client disconnects midway,
+	// abandoning the swap after the old container was stopped would be worse
+	// than finishing it.
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), pullTimeout+5*time.Minute)
+	defer cancel()
+
+	result, err := h.uc.RedeployImage(ctx, name, req.Image)
+	if err != nil {
+		handleError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, DeployResponse{ID: result.ContainerID, Node: result.NodeID, Status: "redeployed"})
+}
+
 func writeJSON(w http.ResponseWriter, status int, body any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -775,6 +816,8 @@ func handleError(w http.ResponseWriter, err error) {
 		jsonError(w, err.Error(), http.StatusUnprocessableEntity)
 	case errors.Is(err, domain.ErrInsufficientResources):
 		jsonError(w, err.Error(), http.StatusUnprocessableEntity)
+	case errors.Is(err, domain.ErrConflict):
+		jsonError(w, err.Error(), http.StatusConflict)
 	case errors.Is(err, domain.ErrContainerNotFound):
 		jsonError(w, err.Error(), http.StatusNotFound)
 	case cerrdefs.IsNotFound(err):
