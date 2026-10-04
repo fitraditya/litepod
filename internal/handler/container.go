@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	cerrdefs "github.com/containerd/errdefs"
 	"github.com/go-chi/chi/v5"
 
 	"github.com/fitraditya/litepod/internal/domain"
@@ -776,6 +777,12 @@ func handleError(w http.ResponseWriter, err error) {
 		jsonError(w, err.Error(), http.StatusUnprocessableEntity)
 	case errors.Is(err, domain.ErrContainerNotFound):
 		jsonError(w, err.Error(), http.StatusNotFound)
+	case cerrdefs.IsNotFound(err):
+		jsonError(w, err.Error(), http.StatusNotFound)
+	case cerrdefs.IsConflict(err):
+		jsonError(w, err.Error(), http.StatusConflict)
+	case cerrdefs.IsInvalidArgument(err):
+		jsonError(w, err.Error(), http.StatusUnprocessableEntity)
 	default:
 		jsonError(w, err.Error(), http.StatusInternalServerError)
 	}

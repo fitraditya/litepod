@@ -21,7 +21,7 @@ func TestAuth(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
-		assert.Equal(t, http.StatusForbidden, rec.Code)
+		assert.Equal(t, http.StatusUnauthorized, rec.Code)
 	})
 
 	t.Run("wrong key", func(t *testing.T) {
@@ -29,7 +29,7 @@ func TestAuth(t *testing.T) {
 		req.Header.Set("X-API-KEY", "wrong")
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
-		assert.Equal(t, http.StatusForbidden, rec.Code)
+		assert.Equal(t, http.StatusUnauthorized, rec.Code)
 	})
 
 	t.Run("correct key", func(t *testing.T) {
@@ -55,5 +55,5 @@ func TestAuth_EmptyConfiguredKey(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
-	assert.Equal(t, http.StatusForbidden, rec.Code)
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }

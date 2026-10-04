@@ -306,22 +306,31 @@ func TestReset_NamedVolume(t *testing.T) {
 	require.NoError(t, uc.Reset(context.Background(), "app1"))
 }
 
-func TestReset_NamedVolume_DeleteError(t *testing.T) {
+func TestReset_NamedVolume_MountpointError(t *testing.T) {
 	repo := &mockRepo{
-		VolumePathFunc:   func(ctx context.Context, name string) (string, error) { return "user1_data", nil },
-		DeleteVolumeFunc: func(ctx context.Context, name string) error { return errors.New("x") },
+		VolumePathFunc:       func(ctx context.Context, name string) (string, error) { return "user1_data", nil },
+		VolumeMountpointFunc: func(ctx context.Context, name string) (string, error) { return "", errors.New("x") },
 	}
 	uc := newTestUC(repo, nil, nil)
 	assert.Error(t, uc.Reset(context.Background(), "app1"))
 }
 
-func TestReset_NamedVolume_CreateError(t *testing.T) {
+func TestReset_NamedVolume_WipesContentsKeepsVolume(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "f"), []byte("x"), 0o644))
+	require.NoError(t, os.Mkdir(filepath.Join(dir, "sub"), 0o755))
+	deleted := false
 	repo := &mockRepo{
-		VolumePathFunc:   func(ctx context.Context, name string) (string, error) { return "user1_data", nil },
-		CreateVolumeFunc: func(ctx context.Context, name string) error { return errors.New("x") },
+		VolumePathFunc:       func(ctx context.Context, name string) (string, error) { return "user1_data", nil },
+		VolumeMountpointFunc: func(ctx context.Context, name string) (string, error) { return dir, nil },
+		DeleteVolumeFunc:     func(ctx context.Context, name string) error { deleted = true; return nil },
 	}
 	uc := newTestUC(repo, nil, nil)
-	assert.Error(t, uc.Reset(context.Background(), "app1"))
+	require.NoError(t, uc.Reset(context.Background(), "app1"))
+	entries, err := os.ReadDir(dir)
+	require.NoError(t, err)
+	assert.Empty(t, entries)
+	assert.False(t, deleted)
 }
 
 func TestReset_NamedVolume_RestartError(t *testing.T) {

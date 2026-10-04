@@ -19,7 +19,7 @@ func Auth(cfg *config.Config) func(http.Handler) http.Handler {
 			// treats two empty byte slices as equal, which would otherwise
 			// let every request through when APIKey is unset.
 			if cfg.APIKey == "" || subtle.ConstantTimeCompare([]byte(got), []byte(cfg.APIKey)) != 1 {
-				http.Error(w, "Unauthorized", http.StatusForbidden)
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
 			}
 			next.ServeHTTP(w, r)

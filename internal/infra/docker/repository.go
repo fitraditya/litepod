@@ -11,6 +11,7 @@ import (
 
 	"io"
 
+	cerrdefs "github.com/containerd/errdefs"
 	dockertypes "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
@@ -170,6 +171,10 @@ func (r *Repository) Run(ctx context.Context, spec domain.DeploySpec) (string, e
 
 	resp, err := r.cli.ContainerCreate(ctx, cfg, hostCfg, networkingCfg, nil, spec.Name)
 	if err != nil {
+		if cerrdefs.IsNotFound(err) {
+			// Missing image (or network) is a caller mistake, not a node fault.
+			return "", fmt.Errorf("%w: %v", domain.ErrInvalidInput, err)
+		}
 		return "", fmt.Errorf("create container: %w", err)
 	}
 
@@ -536,6 +541,18 @@ func (r *Repository) DeleteVolume(ctx context.Context, name string) error {
 		return fmt.Errorf("delete volume %q: %w", name, err)
 	}
 	return nil
+}
+
+// VolumeMountpoint returns the host directory backing a named Docker volume.
+func (r *Repository) VolumeMountpoint(ctx context.Context, name string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	v, err := r.cli.VolumeInspect(ctx, name)
+	if err != nil {
+		return "", fmt.Errorf("inspect volume %q: %w", name, err)
+	}
+	return v.Mountpoint, nil
 }
 
 func (r *Repository) ListVolumes(ctx context.Context) ([]string, error) {

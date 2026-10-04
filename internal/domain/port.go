@@ -30,6 +30,8 @@ type ContainerRepo interface {
 	CreateVolume(ctx context.Context, name string) error
 	DeleteVolume(ctx context.Context, name string) error
 	ListVolumes(ctx context.Context) ([]string, error)
+	// VolumeMountpoint returns the host directory backing a named volume.
+	VolumeMountpoint(ctx context.Context, name string) (string, error)
 
 	// Image Management
 	ImageExists(ctx context.Context, image string) (bool, error)

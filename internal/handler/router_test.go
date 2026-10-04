@@ -30,7 +30,7 @@ func TestRouter_ContainersRequiresAuth(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/containers", nil)
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, req)
-		assert.Equal(t, http.StatusForbidden, rec.Code)
+		assert.Equal(t, http.StatusUnauthorized, rec.Code)
 	})
 
 	t.Run("wrong key", func(t *testing.T) {
@@ -38,7 +38,7 @@ func TestRouter_ContainersRequiresAuth(t *testing.T) {
 		req.Header.Set("X-API-KEY", "nope")
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, req)
-		assert.Equal(t, http.StatusForbidden, rec.Code)
+		assert.Equal(t, http.StatusUnauthorized, rec.Code)
 	})
 
 	t.Run("correct key", func(t *testing.T) {
@@ -124,6 +124,6 @@ func TestRouter_ImagesNetworksVolumesRequireAuth(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, req)
-		assert.Equal(t, http.StatusForbidden, rec.Code, path)
+		assert.Equal(t, http.StatusUnauthorized, rec.Code, path)
 	}
 }

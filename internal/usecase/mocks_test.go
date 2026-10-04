@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"os"
 
 	"github.com/fitraditya/litepod/internal/domain"
 )
@@ -9,30 +10,31 @@ import (
 // mockRepo is a function-field fake of domain.ContainerRepo. Any Func left
 // nil returns the type's zero value and a nil error.
 type mockRepo struct {
-	RunFunc           func(ctx context.Context, spec domain.DeploySpec) (string, error)
-	StopFunc          func(ctx context.Context, name string, timeout int) error
-	StartFunc         func(ctx context.Context, name string) error
-	RemoveFunc        func(ctx context.Context, name string, force, removeVols bool) error
-	RestartFunc       func(ctx context.Context, name string) error
-	PauseFunc         func(ctx context.Context, name string) error
-	UnpauseFunc       func(ctx context.Context, name string) error
-	KillFunc          func(ctx context.Context, name string, signal string) error
-	ListFunc          func(ctx context.Context, all bool) ([]domain.ContainerSummary, error)
-	ResourcesFunc     func(ctx context.Context, id string) (domain.ContainerResources, error)
-	StatsFunc         func(ctx context.Context, name string) (*domain.Stats, error)
-	VolumePathFunc    func(ctx context.Context, name string) (string, error)
-	IPFunc            func(ctx context.Context, name string) (string, error)
-	StateFunc         func(ctx context.Context, name string) (*domain.ContainerState, error)
-	LogsFunc          func(ctx context.Context, name string, tail int, timestamps bool) (string, error)
-	CreateNetworkFunc func(ctx context.Context, name string) error
-	DeleteNetworkFunc func(ctx context.Context, name string) error
-	ListNetworksFunc  func(ctx context.Context) ([]string, error)
-	CreateVolumeFunc  func(ctx context.Context, name string) error
-	DeleteVolumeFunc  func(ctx context.Context, name string) error
-	ListVolumesFunc   func(ctx context.Context) ([]string, error)
-	ImageExistsFunc   func(ctx context.Context, image string) (bool, error)
-	PullImageFunc     func(ctx context.Context, image string) error
-	ListImagesFunc    func(ctx context.Context) ([]domain.ImageSummary, error)
+	RunFunc              func(ctx context.Context, spec domain.DeploySpec) (string, error)
+	StopFunc             func(ctx context.Context, name string, timeout int) error
+	StartFunc            func(ctx context.Context, name string) error
+	RemoveFunc           func(ctx context.Context, name string, force, removeVols bool) error
+	RestartFunc          func(ctx context.Context, name string) error
+	PauseFunc            func(ctx context.Context, name string) error
+	UnpauseFunc          func(ctx context.Context, name string) error
+	KillFunc             func(ctx context.Context, name string, signal string) error
+	ListFunc             func(ctx context.Context, all bool) ([]domain.ContainerSummary, error)
+	ResourcesFunc        func(ctx context.Context, id string) (domain.ContainerResources, error)
+	StatsFunc            func(ctx context.Context, name string) (*domain.Stats, error)
+	VolumePathFunc       func(ctx context.Context, name string) (string, error)
+	IPFunc               func(ctx context.Context, name string) (string, error)
+	StateFunc            func(ctx context.Context, name string) (*domain.ContainerState, error)
+	LogsFunc             func(ctx context.Context, name string, tail int, timestamps bool) (string, error)
+	CreateNetworkFunc    func(ctx context.Context, name string) error
+	DeleteNetworkFunc    func(ctx context.Context, name string) error
+	ListNetworksFunc     func(ctx context.Context) ([]string, error)
+	CreateVolumeFunc     func(ctx context.Context, name string) error
+	DeleteVolumeFunc     func(ctx context.Context, name string) error
+	VolumeMountpointFunc func(ctx context.Context, name string) (string, error)
+	ListVolumesFunc      func(ctx context.Context) ([]string, error)
+	ImageExistsFunc      func(ctx context.Context, image string) (bool, error)
+	PullImageFunc        func(ctx context.Context, image string) error
+	ListImagesFunc       func(ctx context.Context) ([]domain.ImageSummary, error)
 }
 
 func (m *mockRepo) Run(ctx context.Context, spec domain.DeploySpec) (string, error) {
@@ -221,4 +223,12 @@ func (m *mockSystemMetrics) MemAvailMB() (uint64, error) {
 		return m.MemAvailMBFunc()
 	}
 	return 0, nil
+}
+
+func (m *mockRepo) VolumeMountpoint(ctx context.Context, name string) (string, error) {
+	if m.VolumeMountpointFunc != nil {
+		return m.VolumeMountpointFunc(ctx, name)
+	}
+	// Fresh empty dir so a default Reset never touches real data.
+	return os.MkdirTemp("", "mock-volume-")
 }

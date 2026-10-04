@@ -333,14 +333,26 @@ func (uc *ContainerUseCase) Reset(ctx context.Context, name string) error {
 
 	if !filepath.IsAbs(volPath) {
 		// volPath is a Docker named volume name, not a host directory.
-		// Wipe its contents by removing and recreating the volume under the same name.
-		if err := uc.repo.DeleteVolume(ctx, volPath); err != nil {
-			log.WithError(err).Error("Delete named volume failed")
-			return fmt.Errorf("delete volume: %w", err)
+		// Docker refuses to delete a volume still referenced by the (stopped)
+		// container, so wipe the contents in place via the volume's mountpoint.
+		mp, err := uc.repo.VolumeMountpoint(ctx, volPath)
+		if err != nil {
+			log.WithError(err).Error("Resolve named volume mountpoint failed")
+			return fmt.Errorf("resolve volume: %w", err)
 		}
-		if err := uc.repo.CreateVolume(ctx, volPath); err != nil {
-			log.WithError(err).Error("Recreate named volume failed")
-			return fmt.Errorf("recreate volume: %w", err)
+		if !filepath.IsAbs(mp) {
+			return fmt.Errorf("resolve volume: unexpected mountpoint %q", mp)
+		}
+		entries, err := os.ReadDir(mp)
+		if err != nil {
+			log.WithError(err).Error("Read named volume failed")
+			return fmt.Errorf("read volume: %w", err)
+		}
+		for _, e := range entries {
+			if err := os.RemoveAll(filepath.Join(mp, e.Name())); err != nil {
+				log.WithError(err).Error("Wipe named volume failed")
+				return fmt.Errorf("wipe volume: %w", err)
+			}
 		}
 
 		if err := uc.repo.Restart(ctx, name); err != nil {
