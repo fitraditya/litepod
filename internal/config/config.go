@@ -25,6 +25,13 @@ func (r PortRange) Contains(port int) bool {
 	return port >= r.Min && port <= r.Max
 }
 
+// RegistryAuth is a credential for one container registry (a password or
+// access token, e.g. a GitHub PAT with read:packages for ghcr.io).
+type RegistryAuth struct {
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
+}
+
 // defaultVolumeBase is used when volume_base is not set in config.yaml.
 const defaultVolumeBase = "/home/deployer/data/"
 
@@ -41,6 +48,11 @@ type Config struct {
 	// Empty = webhook routes are not mounted at all.
 	WebhookAPIKey string `yaml:"webhook_api_key"`
 	SentryDSN     string `yaml:"sentry_dsn"`
+	// Registries maps a registry host (e.g. "ghcr.io", "registry.example.com:5000",
+	// "docker.io") to the credentials used when pulling images from it.
+	// Hosts not listed are pulled anonymously. Keys are normalized by Load
+	// (lowercased; "index.docker.io" -> "docker.io").
+	Registries map[string]RegistryAuth `yaml:"registries"`
 	// Port the HTTP server listens on. Zero means "use the default for
 	// whether TLS is enabled" (see main.go: 8080 plain, 8443 with
 	// TLS_CERT_FILE/TLS_KEY_FILE set) — resolved at startup, not here, since
@@ -164,6 +176,27 @@ func Load(path string) (*Config, error) {
 
 	if cfg.APIKey == "" {
 		return nil, fmt.Errorf("api_key is required (set it in config.yaml or via AGENT_BOX_API_KEY)")
+	}
+
+	if len(cfg.Registries) > 0 {
+		norm := make(map[string]RegistryAuth, len(cfg.Registries))
+		for host, a := range cfg.Registries {
+			h := strings.ToLower(strings.TrimSpace(host))
+			if h == "index.docker.io" {
+				h = "docker.io"
+			}
+			if h == "" || strings.ContainsAny(h, "/ ") {
+				return nil, fmt.Errorf("registries: invalid registry host %q (use host[:port], no scheme or path)", host)
+			}
+			if a.Username == "" || a.Password == "" {
+				return nil, fmt.Errorf("registries[%q]: username and password are required", host)
+			}
+			if _, dup := norm[h]; dup {
+				return nil, fmt.Errorf("registries: duplicate registry host %q", h)
+			}
+			norm[h] = a
+		}
+		cfg.Registries = norm
 	}
 
 	if cfg.WebhookAPIKey != "" && cfg.WebhookAPIKey == cfg.APIKey {

@@ -372,7 +372,9 @@ definitions:
     type: object
 info:
   contact: {}
-  description: HTTP API for managing containerized services on a Litepod node.
+  description: HTTP API for managing containerized services on a Litepod node. Missing
+    or wrong credentials return 401. Docker "not found" errors map to 404, conflicts
+    to 409, and invalid input (including a missing image) to 422.
   title: Litepod API
   version: "1.0"
 paths:
@@ -388,6 +390,10 @@ paths:
             items:
               $ref: '#/definitions/handler.ContainerItem'
             type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -400,8 +406,10 @@ paths:
     post:
       consumes:
       - application/json
-      description: Checks node capacity, creates the volume directory, and starts
-        a new container.
+      description: 'Checks node capacity, creates the volume directory, and starts
+        a new container. Does not pull the image: it must already exist on the node
+        (use POST /images/pull first), otherwise 422. A duplicate container name returns
+        409.'
       parameters:
       - description: Container deploy request
         in: body
@@ -418,6 +426,14 @@ paths:
             $ref: '#/definitions/handler.DeployResponse'
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "409":
+          description: Conflict
           schema:
             $ref: '#/definitions/handler.ErrorResponse'
         "422":
@@ -447,8 +463,16 @@ paths:
       responses:
         "204":
           description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
         "404":
           description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "409":
+          description: Conflict
           schema:
             $ref: '#/definitions/handler.ErrorResponse'
         "500":
@@ -463,7 +487,10 @@ paths:
     put:
       consumes:
       - application/json
-      description: Performs an atomic stop-remove-start cycle with the new spec.
+      description: 'Stop-remove-start cycle with the new spec (the body replaces the
+        whole spec). Does not pull the image: it must already exist on the node (use
+        POST /images/pull first), otherwise 422. To roll out a new image tag from
+        CI, prefer POST /webhook/containers/{name}/deploy.'
       parameters:
       - description: Container name
         in: path
@@ -485,6 +512,18 @@ paths:
             $ref: '#/definitions/handler.UpdateResponse'
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "409":
+          description: Conflict
           schema:
             $ref: '#/definitions/handler.ErrorResponse'
         "422":
@@ -516,6 +555,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/handler.IPResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
         "404":
           description: Not Found
           schema:
@@ -550,8 +593,16 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/handler.ActionResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
         "404":
           description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "409":
+          description: Conflict
           schema:
             $ref: '#/definitions/handler.ErrorResponse'
         "500":
@@ -587,6 +638,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/handler.LogsResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
         "404":
           description: Not Found
           schema:
@@ -617,8 +672,16 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/handler.ActionResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
         "404":
           description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "409":
+          description: Conflict
           schema:
             $ref: '#/definitions/handler.ErrorResponse'
         "500":
@@ -646,8 +709,16 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/handler.ActionResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
         "404":
           description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "409":
+          description: Conflict
           schema:
             $ref: '#/definitions/handler.ErrorResponse'
         "500":
@@ -675,6 +746,18 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/handler.ActionResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -700,8 +783,16 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/handler.ActionResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
         "404":
           description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "409":
+          description: Conflict
           schema:
             $ref: '#/definitions/handler.ErrorResponse'
         "500":
@@ -729,6 +820,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/domain.ContainerState'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
         "404":
           description: Not Found
           schema:
@@ -758,6 +853,14 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/handler.StatsResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -783,8 +886,16 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/handler.ActionResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
         "404":
           description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "409":
+          description: Conflict
           schema:
             $ref: '#/definitions/handler.ErrorResponse'
         "500":
@@ -812,6 +923,18 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/handler.ActionResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -837,8 +960,16 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/handler.ActionResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
         "404":
           description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "409":
+          description: Conflict
           schema:
             $ref: '#/definitions/handler.ErrorResponse'
         "500":
@@ -866,6 +997,18 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/handler.ActionResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -905,6 +1048,10 @@ paths:
             items:
               $ref: '#/definitions/handler.ImageItem'
             type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -931,6 +1078,10 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/handler.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
         "404":
           description: Not Found
           schema:
@@ -948,7 +1099,10 @@ paths:
     post:
       consumes:
       - application/json
-      description: Initiates pulling an image from the container registry in the background.
+      description: Initiates pulling an image from the container registry in the background;
+        poll HEAD /images to check the result. Uses the credentials configured under
+        `registries` in config.yaml for the image's registry host, and pulls anonymously
+        for unlisted hosts.
       parameters:
       - description: Pull image request
         in: body
@@ -963,6 +1117,10 @@ paths:
           description: Accepted
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
+        "401":
+          description: Unauthorized
           schema:
             $ref: '#/definitions/handler.ErrorResponse'
         "500":
@@ -984,6 +1142,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/handler.ResourceListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -1013,6 +1175,10 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/handler.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -1040,6 +1206,10 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/handler.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -1059,6 +1229,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/handler.ResourceListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -1088,6 +1262,10 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/handler.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -1115,6 +1293,10 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/handler.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -1129,8 +1311,11 @@ paths:
       consumes:
       - application/json
       description: Pulls the image (must be from the repository the container already
-        runs), then recreates the container from its existing config. Blocks until
-        done; the old container is restored if the new one fails to start.
+        runs; uses configured `registries` credentials), then recreates the container
+        from its existing config. Blocks until done; the old container is restored
+        if the new one fails to start. A stopped container stays stopped. Only mounted
+        when webhook_api_key is configured; the main X-API-KEY is not accepted here.
+        Returns 409 if a redeploy of the same container is already running.
       parameters:
       - description: Container name
         in: path
@@ -1181,7 +1366,8 @@ paths:
       - webhook
 securityDefinitions:
   ApiKeyAuth:
-    description: API key required for all /containers endpoints
+    description: API key required for /containers, /images, /networks and /volumes
+      endpoints
     in: header
     name: X-API-KEY
     type: apiKey

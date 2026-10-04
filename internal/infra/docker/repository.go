@@ -12,9 +12,11 @@ import (
 	"io"
 
 	cerrdefs "github.com/containerd/errdefs"
+	"github.com/distribution/reference"
 	dockertypes "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
@@ -32,10 +34,53 @@ const timeout = 30 * time.Second
 type Repository struct {
 	cli *client.Client
 	log *logger.Logger
+
+	registryAuth map[string]RegistryCredential
 }
 
 func NewRepository(cli *client.Client, log *logger.Logger) *Repository {
 	return &Repository{cli: cli, log: log}
+}
+
+// RegistryCredential is a username/password (or token) for one registry host.
+type RegistryCredential struct {
+	Username string
+	Password string
+}
+
+// WithRegistryAuth sets per-registry pull credentials, keyed by normalized
+// registry host ("docker.io", "ghcr.io", "host:5000"). Images from hosts not
+// in the map are pulled anonymously.
+func (r *Repository) WithRegistryAuth(creds map[string]RegistryCredential) *Repository {
+	r.registryAuth = creds
+	return r
+}
+
+// pullAuth returns the base64 X-Registry-Auth value for imageName's registry,
+// or "" if no credentials are configured for it. The Docker daemon doesn't
+// read ~/.docker/config.json — credentials must accompany each pull request.
+func (r *Repository) pullAuth(imageName string) (string, error) {
+	if len(r.registryAuth) == 0 {
+		return "", nil
+	}
+	ref, err := reference.ParseNormalizedNamed(imageName)
+	if err != nil {
+		return "", fmt.Errorf("%w: invalid image reference %q: %v", domain.ErrInvalidInput, imageName, err)
+	}
+	host := reference.Domain(ref)
+	c, ok := r.registryAuth[host]
+	if !ok {
+		return "", nil
+	}
+	enc, err := registry.EncodeAuthConfig(registry.AuthConfig{
+		Username:      c.Username,
+		Password:      c.Password,
+		ServerAddress: host,
+	})
+	if err != nil {
+		return "", fmt.Errorf("encode registry auth for %s: %w", host, err)
+	}
+	return enc, nil
 }
 
 func (r *Repository) Run(ctx context.Context, spec domain.DeploySpec) (string, error) {
@@ -278,7 +323,11 @@ func (r *Repository) ImageExists(ctx context.Context, imageName string) (bool, e
 // auth) show up as an "error" field inside the stream, not as a Go error, so
 // the stream must be decoded and inspected rather than just drained.
 func (r *Repository) PullImage(ctx context.Context, imageName string) error {
-	out, err := r.cli.ImagePull(ctx, imageName, image.PullOptions{})
+	auth, err := r.pullAuth(imageName)
+	if err != nil {
+		return err
+	}
+	out, err := r.cli.ImagePull(ctx, imageName, image.PullOptions{RegistryAuth: auth})
 	if err != nil {
 		return fmt.Errorf("pull image %s: %w", imageName, err)
 	}

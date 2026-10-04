@@ -184,3 +184,33 @@ func TestLoad_WebhookKey(t *testing.T) {
 		assert.Error(t, err)
 	})
 }
+
+func TestLoad_Registries(t *testing.T) {
+	t.Run("parsed and normalized", func(t *testing.T) {
+		cfg, err := Load(writeTempConfig(t, `
+api_key: a
+registries:
+  GHCR.io:
+    username: u1
+    password: p1
+  registry.example.com:5000:
+    username: u2
+    password: p2
+  index.docker.io:
+    username: u3
+    password: p3
+`))
+		require.NoError(t, err)
+		assert.Equal(t, RegistryAuth{"u1", "p1"}, cfg.Registries["ghcr.io"])
+		assert.Equal(t, RegistryAuth{"u2", "p2"}, cfg.Registries["registry.example.com:5000"])
+		assert.Equal(t, RegistryAuth{"u3", "p3"}, cfg.Registries["docker.io"])
+	})
+	t.Run("missing password", func(t *testing.T) {
+		_, err := Load(writeTempConfig(t, "api_key: a\nregistries:\n  ghcr.io:\n    username: u\n"))
+		assert.Error(t, err)
+	})
+	t.Run("host with scheme or path rejected", func(t *testing.T) {
+		_, err := Load(writeTempConfig(t, "api_key: a\nregistries:\n  \"https://ghcr.io\":\n    username: u\n    password: p\n"))
+		assert.Error(t, err)
+	})
+}

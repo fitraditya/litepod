@@ -56,13 +56,15 @@ func NewContainerHandler(uc *usecase.ContainerUseCase, log *logger.Logger) *Cont
 
 // Deploy godoc
 // @Summary      Deploy a container
-// @Description  Checks node capacity, creates the volume directory, and starts a new container.
+// @Description  Checks node capacity, creates the volume directory, and starts a new container. Does not pull the image: it must already exist on the node (use POST /images/pull first), otherwise 422. A duplicate container name returns 409.
 // @Tags         containers
 // @Accept       json
 // @Produce      json
 // @Param        body  body      DeployPayload  true  "Container deploy request"
 // @Success      201   {object}  DeployResponse
 // @Failure      400   {object}  ErrorResponse
+// @Failure      401  {object}  ErrorResponse
+// @Failure      409  {object}  ErrorResponse
 // @Failure      422   {object}  ErrorResponse
 // @Failure      500   {object}  ErrorResponse
 // @Security     ApiKeyAuth
@@ -88,7 +90,7 @@ func (h *ContainerHandler) Deploy(w http.ResponseWriter, r *http.Request) {
 
 // Update godoc
 // @Summary      Update a container
-// @Description  Performs an atomic stop-remove-start cycle with the new spec.
+// @Description  Stop-remove-start cycle with the new spec (the body replaces the whole spec). Does not pull the image: it must already exist on the node (use POST /images/pull first), otherwise 422. To roll out a new image tag from CI, prefer POST /webhook/containers/{name}/deploy.
 // @Tags         containers
 // @Accept       json
 // @Produce      json
@@ -96,6 +98,9 @@ func (h *ContainerHandler) Deploy(w http.ResponseWriter, r *http.Request) {
 // @Param        body  body      DeployPayload  true  "Container update request"
 // @Success      200   {object}  UpdateResponse
 // @Failure      400   {object}  ErrorResponse
+// @Failure      401  {object}  ErrorResponse
+// @Failure      404  {object}  ErrorResponse
+// @Failure      409  {object}  ErrorResponse
 // @Failure      422   {object}  ErrorResponse
 // @Failure      500   {object}  ErrorResponse
 // @Security     ApiKeyAuth
@@ -126,7 +131,9 @@ func (h *ContainerHandler) Update(w http.ResponseWriter, r *http.Request) {
 // @Produce      json
 // @Param        name  path  string  true  "Container name"
 // @Success      204
+// @Failure      401  {object}  ErrorResponse
 // @Failure      404  {object}  ErrorResponse
+// @Failure      409  {object}  ErrorResponse
 // @Failure      500  {object}  ErrorResponse
 // @Security     ApiKeyAuth
 // @Router       /containers/{name} [delete]
@@ -146,6 +153,9 @@ func (h *ContainerHandler) Destroy(w http.ResponseWriter, r *http.Request) {
 // @Produce      json
 // @Param        name  path      string          true  "Container name"
 // @Success      200   {object}  ActionResponse
+// @Failure      401  {object}  ErrorResponse
+// @Failure      404  {object}  ErrorResponse
+// @Failure      409  {object}  ErrorResponse
 // @Failure      500   {object}  ErrorResponse
 // @Security     ApiKeyAuth
 // @Router       /containers/{name}/restart [post]
@@ -165,7 +175,9 @@ func (h *ContainerHandler) Restart(w http.ResponseWriter, r *http.Request) {
 // @Produce      json
 // @Param        name  path      string      true  "Container name"
 // @Success      200   {object}  ActionResponse
+// @Failure      401  {object}  ErrorResponse
 // @Failure      404   {object}  ErrorResponse
+// @Failure      409  {object}  ErrorResponse
 // @Failure      500   {object}  ErrorResponse
 // @Security     ApiKeyAuth
 // @Router       /containers/{name}/start [post]
@@ -185,7 +197,9 @@ func (h *ContainerHandler) Start(w http.ResponseWriter, r *http.Request) {
 // @Produce      json
 // @Param        name  path      string      true  "Container name"
 // @Success      200   {object}  ActionResponse
+// @Failure      401  {object}  ErrorResponse
 // @Failure      404   {object}  ErrorResponse
+// @Failure      409  {object}  ErrorResponse
 // @Failure      500   {object}  ErrorResponse
 // @Security     ApiKeyAuth
 // @Router       /containers/{name}/stop [post]
@@ -205,7 +219,9 @@ func (h *ContainerHandler) Stop(w http.ResponseWriter, r *http.Request) {
 // @Produce      json
 // @Param        name  path      string          true  "Container name"
 // @Success      200   {object}  ActionResponse
+// @Failure      401  {object}  ErrorResponse
 // @Failure      404   {object}  ErrorResponse
+// @Failure      409  {object}  ErrorResponse
 // @Failure      500   {object}  ErrorResponse
 // @Security     ApiKeyAuth
 // @Router       /containers/{name}/reset [post]
@@ -224,6 +240,7 @@ func (h *ContainerHandler) Reset(w http.ResponseWriter, r *http.Request) {
 // @Tags         containers
 // @Produce      json
 // @Success      200  {array}   ContainerItem
+// @Failure      401  {object}  ErrorResponse
 // @Failure      500  {object}  ErrorResponse
 // @Security     ApiKeyAuth
 // @Router       /containers [get]
@@ -253,7 +270,9 @@ func (h *ContainerHandler) List(w http.ResponseWriter, r *http.Request) {
 // @Produce      json
 // @Param        name  path      string      true  "Container name"
 // @Success      200   {object}  ActionResponse
+// @Failure      401  {object}  ErrorResponse
 // @Failure      404   {object}  ErrorResponse
+// @Failure      409  {object}  ErrorResponse
 // @Failure      500   {object}  ErrorResponse
 // @Security     ApiKeyAuth
 // @Router       /containers/{name}/pause [post]
@@ -273,7 +292,9 @@ func (h *ContainerHandler) Pause(w http.ResponseWriter, r *http.Request) {
 // @Produce      json
 // @Param        name  path      string      true  "Container name"
 // @Success      200   {object}  ActionResponse
+// @Failure      401  {object}  ErrorResponse
 // @Failure      404   {object}  ErrorResponse
+// @Failure      409  {object}  ErrorResponse
 // @Failure      500   {object}  ErrorResponse
 // @Security     ApiKeyAuth
 // @Router       /containers/{name}/unpause [post]
@@ -294,7 +315,9 @@ func (h *ContainerHandler) Unpause(w http.ResponseWriter, r *http.Request) {
 // @Param        name    path   string  true   "Container name"
 // @Param        signal  query  string  false  "Signal to send (default SIGKILL)"
 // @Success      200   {object}  ActionResponse
+// @Failure      401  {object}  ErrorResponse
 // @Failure      404   {object}  ErrorResponse
+// @Failure      409  {object}  ErrorResponse
 // @Failure      500   {object}  ErrorResponse
 // @Security     ApiKeyAuth
 // @Router       /containers/{name}/kill [post]
@@ -315,6 +338,9 @@ func (h *ContainerHandler) Kill(w http.ResponseWriter, r *http.Request) {
 // @Produce      json
 // @Param        name  path  string  true  "Container name"
 // @Success      200   {object}  ActionResponse
+// @Failure      401  {object}  ErrorResponse
+// @Failure      404  {object}  ErrorResponse
+// @Failure      409  {object}  ErrorResponse
 // @Failure      500   {object}  ErrorResponse
 // @Security     ApiKeyAuth
 // @Router       /containers/{name}/suspend [post]
@@ -334,6 +360,9 @@ func (h *ContainerHandler) Suspend(w http.ResponseWriter, r *http.Request) {
 // @Produce      json
 // @Param        name  path  string  true  "Container name"
 // @Success      200   {object}  ActionResponse
+// @Failure      401  {object}  ErrorResponse
+// @Failure      404  {object}  ErrorResponse
+// @Failure      409  {object}  ErrorResponse
 // @Failure      500   {object}  ErrorResponse
 // @Security     ApiKeyAuth
 // @Router       /containers/{name}/unsuspend [post]
@@ -353,6 +382,7 @@ func (h *ContainerHandler) Unsuspend(w http.ResponseWriter, r *http.Request) {
 // @Produce      json
 // @Param        name  path      string      true  "Container name"
 // @Success      200   {object}  IPResponse
+// @Failure      401  {object}  ErrorResponse
 // @Failure      404   {object}  ErrorResponse
 // @Failure      500   {object}  ErrorResponse
 // @Security     ApiKeyAuth
@@ -374,6 +404,8 @@ func (h *ContainerHandler) IP(w http.ResponseWriter, r *http.Request) {
 // @Produce      json
 // @Param        name  path      string         true  "Container name"
 // @Success      200   {object}  StatsResponse
+// @Failure      401  {object}  ErrorResponse
+// @Failure      404  {object}  ErrorResponse
 // @Failure      500   {object}  ErrorResponse
 // @Security     ApiKeyAuth
 // @Router       /containers/{name}/stats [get]
@@ -400,6 +432,7 @@ func (h *ContainerHandler) Stats(w http.ResponseWriter, r *http.Request) {
 // @Produce      json
 // @Param        name  path      string         true  "Container name"
 // @Success      200   {object}  domain.ContainerState
+// @Failure      401  {object}  ErrorResponse
 // @Failure      404   {object}  ErrorResponse
 // @Failure      500   {object}  ErrorResponse
 // @Security     ApiKeyAuth
@@ -423,6 +456,7 @@ func (h *ContainerHandler) State(w http.ResponseWriter, r *http.Request) {
 // @Param        tail        query     int     false  "Number of lines to return from the end of the logs (0 = all)"
 // @Param        timestamps  query     bool    false  "Include timestamps in each log line"
 // @Success      200  {object}  LogsResponse
+// @Failure      401  {object}  ErrorResponse
 // @Failure      404  {object}  ErrorResponse
 // @Failure      500  {object}  ErrorResponse
 // @Security     ApiKeyAuth
@@ -534,6 +568,7 @@ func toDomainRequest(req DeployPayload) domain.DeployRequest {
 // @Param        body  body      NetworkPayload  true  "Network creation request"
 // @Success      201
 // @Failure      400  {object}  ErrorResponse
+// @Failure      401  {object}  ErrorResponse
 // @Failure      500  {object}  ErrorResponse
 // @Security     ApiKeyAuth
 // @Router       /networks [post]
@@ -557,6 +592,7 @@ func (h *ContainerHandler) CreateNetwork(w http.ResponseWriter, r *http.Request)
 // @Param        name  path  string  true  "Network name"
 // @Success      204
 // @Failure      400  {object}  ErrorResponse
+// @Failure      401  {object}  ErrorResponse
 // @Failure      500  {object}  ErrorResponse
 // @Security     ApiKeyAuth
 // @Router       /networks/{name} [delete]
@@ -575,6 +611,7 @@ func (h *ContainerHandler) DeleteNetwork(w http.ResponseWriter, r *http.Request)
 // @Tags         networks
 // @Produce      json
 // @Success      200  {object}  ResourceListResponse
+// @Failure      401  {object}  ErrorResponse
 // @Failure      500  {object}  ErrorResponse
 // @Security     ApiKeyAuth
 // @Router       /networks [get]
@@ -598,6 +635,7 @@ func (h *ContainerHandler) ListNetworks(w http.ResponseWriter, r *http.Request) 
 // @Param        body  body      VolumePayload  true  "Volume creation request"
 // @Success      201
 // @Failure      400  {object}  ErrorResponse
+// @Failure      401  {object}  ErrorResponse
 // @Failure      500  {object}  ErrorResponse
 // @Security     ApiKeyAuth
 // @Router       /volumes [post]
@@ -621,6 +659,7 @@ func (h *ContainerHandler) CreateVolume(w http.ResponseWriter, r *http.Request) 
 // @Param        name  path  string  true  "Volume name"
 // @Success      204
 // @Failure      400  {object}  ErrorResponse
+// @Failure      401  {object}  ErrorResponse
 // @Failure      500  {object}  ErrorResponse
 // @Security     ApiKeyAuth
 // @Router       /volumes/{name} [delete]
@@ -639,6 +678,7 @@ func (h *ContainerHandler) DeleteVolume(w http.ResponseWriter, r *http.Request) 
 // @Tags         volumes
 // @Produce      json
 // @Success      200  {object}  ResourceListResponse
+// @Failure      401  {object}  ErrorResponse
 // @Failure      500  {object}  ErrorResponse
 // @Security     ApiKeyAuth
 // @Router       /volumes [get]
@@ -657,6 +697,7 @@ func (h *ContainerHandler) ListVolumes(w http.ResponseWriter, r *http.Request) {
 // @Tags         images
 // @Produce      json
 // @Success      200  {array}   ImageItem
+// @Failure      401  {object}  ErrorResponse
 // @Failure      500  {object}  ErrorResponse
 // @Security     ApiKeyAuth
 // @Router       /images [get]
@@ -685,6 +726,7 @@ func (h *ContainerHandler) ListImages(w http.ResponseWriter, r *http.Request) {
 // @Param        name  query  string  true  "Image name"
 // @Success      200
 // @Failure      400  {object}  ErrorResponse
+// @Failure      401  {object}  ErrorResponse
 // @Failure      404  {object}  ErrorResponse
 // @Failure      500  {object}  ErrorResponse
 // @Security     ApiKeyAuth
@@ -709,13 +751,14 @@ func (h *ContainerHandler) CheckImage(w http.ResponseWriter, r *http.Request) {
 
 // PullImage godoc
 // @Summary      Pull a container image
-// @Description  Initiates pulling an image from the container registry in the background.
+// @Description  Initiates pulling an image from the container registry in the background; poll HEAD /images to check the result. Uses the credentials configured under `registries` in config.yaml for the image's registry host, and pulls anonymously for unlisted hosts.
 // @Tags         images
 // @Accept       json
 // @Produce      json
 // @Param        body  body  PullImagePayload  true  "Pull image request"
 // @Success      202
 // @Failure      400  {object}  ErrorResponse
+// @Failure      401  {object}  ErrorResponse
 // @Failure      500  {object}  ErrorResponse
 // @Security     ApiKeyAuth
 // @Router       /images/pull [post]
@@ -761,7 +804,7 @@ func (h *ContainerHandler) PullImage(w http.ResponseWriter, r *http.Request) {
 
 // WebhookDeploy godoc
 // @Summary      Redeploy a container with a new image
-// @Description  Pulls the image (must be from the repository the container already runs), then recreates the container from its existing config. Blocks until done; the old container is restored if the new one fails to start.
+// @Description  Pulls the image (must be from the repository the container already runs; uses configured `registries` credentials), then recreates the container from its existing config. Blocks until done; the old container is restored if the new one fails to start. A stopped container stays stopped. Only mounted when webhook_api_key is configured; the main X-API-KEY is not accepted here. Returns 409 if a redeploy of the same container is already running.
 // @Tags         webhook
 // @Accept       json
 // @Produce      json

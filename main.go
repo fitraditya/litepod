@@ -52,12 +52,12 @@ const (
 
 // @title           Litepod API
 // @version         1.0
-// @description     HTTP API for managing containerized services on a Litepod node.
+// @description     HTTP API for managing containerized services on a Litepod node. Missing or wrong credentials return 401. Docker "not found" errors map to 404, conflicts to 409, and invalid input (including a missing image) to 422.
 // @BasePath        /
 // @securityDefinitions.apikey  ApiKeyAuth
 // @in                          header
 // @name                        X-API-KEY
-// @description                 API key required for all /containers endpoints
+// @description                 API key required for /containers, /images, /networks and /volumes endpoints
 // @securityDefinitions.apikey  BearerAuth
 // @in                          header
 // @name                        Authorization
@@ -83,7 +83,11 @@ func main() {
 		log.WithError(err).Fatal("Docker daemon not reachable")
 	}
 
-	repo := dockerrepo.NewRepository(dockerClient, log)
+	creds := make(map[string]dockerrepo.RegistryCredential, len(cfg.Registries))
+	for host, a := range cfg.Registries {
+		creds[host] = dockerrepo.RegistryCredential{Username: a.Username, Password: a.Password}
+	}
+	repo := dockerrepo.NewRepository(dockerClient, log).WithRegistryAuth(creds)
 	sys := system.NewMetrics()
 	uc := usecase.NewContainerUseCase(repo, sys, cfg, log)
 
